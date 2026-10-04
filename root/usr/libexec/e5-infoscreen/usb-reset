@@ -1,0 +1,89 @@
+#!/bin/sh
+# Re-enumerate the E5 NCM gadget and repair its OpenWrt LAN/DHCP path.
+# Never take usb0 down or recreate the gadget: the vendor NCM driver needs it up.
+set -u
+SYS=${E5_USB_SYSFS:-/sys}
+RUN=${E5_USB_RESET_RUN:-/tmp/run/e5-usb-reset}
+DHCP=${E5_USB_DHCP_SERVICE:-/etc/init.d/dnsmasq}
+WAIT=${E5_USB_RESET_WAIT:-20}
+G=$SYS/kernel/config/usb_gadget/linux
+
+state() { printf '%s\n' "$1" > "$RUN/state"; printf '%s\n' "$2" > "$RUN/message"; }
+fail() { state failed "$*"; printf '%s\n' "$*" >&2; exit 1; }
+step() { printf '%s\n' "$1" > "$RUN/stage"; printf '%s\n' "$1"; }
+controller() {
+    bound=$(cat "$G/UDC" 2>/dev/null || true)
+    UDC=
+    if [ -n "$bound" ] && [ -d "$SYS/class/udc/$bound" ]; then UDC=$SYS/class/udc/$bound
+    else
+        for path in "$SYS"/class/udc/*; do [ -d "$path" ] && { UDC=$path; break; }; done
+    fi
+    [ -n "$UDC" ] && [ -d "$G" ] && [ -w "$UDC/soft_connect" ]
+}
+cleanup() {
+    dmesg 2>/dev/null | grep -iE 'usb|gadget|musb|ncm' | tail -20 > "$RUN/kernel.log" || true
+    date +%s > "$RUN/updated"
+    rm -f "$RUN/pid"
+    rmdir "$RUN/lock" 2>/dev/null || true
+}
+run_reset() {
+    trap cleanup EXIT
+    trap 'fail "USB reset interrupted"' HUP INT TERM
+    printf '%s\n' "$$" > "$RUN/pid"
+    state running 'Restoring USB connection'
+    controller || fail 'USB controller, gadget or soft_connect is unavailable'
+    step binding
+    if [ -z "$bound" ]; then
+        printf '%s\n' "${UDC##*/}" > "$G/UDC" || fail 'Cannot bind the USB gadget to the controller'
+    fi
+    step lan
+    if [ ! -d "$SYS/class/net/br-lan" ]; then
+        ifup lan || fail 'Cannot bring up the configured LAN interface'
+        n=0
+        while [ ! -d "$SYS/class/net/br-lan" ] && [ "$n" -lt 10 ]; do sleep 1; n=$((n + 1)); done
+    fi
+    [ -d "$SYS/class/net/br-lan" ] || fail 'br-lan is missing after LAN startup'
+    [ -d "$SYS/class/net/usb0" ] || fail 'The NCM USB network interface usb0 is missing'
+    ip link set br-lan up || fail 'Cannot bring br-lan up'
+    ip link set usb0 up || fail 'Cannot bring usb0 up'
+    ip -4 addr flush dev usb0 || fail 'Cannot remove the old USB rescue address'
+    if [ -w "$SYS/../proc/sys/net/ipv6/conf/usb0/disable_ipv6" ]; then
+        echo 1 > "$SYS/../proc/sys/net/ipv6/conf/usb0/disable_ipv6"
+    fi
+    [ -e "$SYS/class/net/br-lan/brif/usb0" ] ||
+        ip link set usb0 master br-lan || fail 'Cannot attach usb0 to br-lan'
+    ip -4 -o addr show dev br-lan | grep -q ' inet ' || fail 'br-lan has no IPv4 address; check LAN configuration'
+    step dhcp
+    [ -x "$DHCP" ] || fail 'The DHCP service dnsmasq is not installed'
+    action=start
+    "$DHCP" status >/dev/null 2>&1 && action=reload
+    result=$("$DHCP" "$action" 2>&1) || fail "dnsmasq $action failed: ${result:-check its configuration and log}"
+    step enumeration
+    echo disconnect > "$UDC/soft_connect" || fail 'USB soft disconnect failed'
+    sleep 1
+    echo connect > "$UDC/soft_connect" || fail 'USB soft connect failed'
+    n=0
+    while [ "$(cat "$UDC/state" 2>/dev/null)" != configured ] && [ "$n" -lt "$WAIT" ]; do
+        sleep 1; n=$((n + 1))
+    done
+    current=$(cat "$UDC/state" 2>/dev/null || true)
+    [ "$current" = configured ] || fail "USB did not enumerate (controller state: ${current:-unknown}); check the data cable and computer port"
+    step complete
+    state done 'USB re-enumerated and LAN/DHCP restored; the computer can request an address again'
+}
+
+mkdir -p "$RUN" || exit 1
+case "${1:-}" in
+    start)
+        controller || { echo 'USB controller, gadget or soft_connect is unavailable' >&2; exit 1; }
+        if ! mkdir "$RUN/lock" 2>/dev/null; then
+            echo 'USB reset is already running' >&2; exit 1
+        fi
+        step queued
+        state running 'USB reset queued'
+        ( "$0" run > "$RUN/reset.log" 2>&1 < /dev/null & )
+        echo 'USB reset queued'
+        ;;
+    run) run_reset ;;
+    *) echo 'usage: usb-reset start' >&2; exit 2 ;;
+esac

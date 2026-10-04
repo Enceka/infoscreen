@@ -564,6 +564,49 @@ const system_cat = {
 	}
 };
 
+const usb_cat = {
+	id: 'usb', label: L('USB', 'USB'),
+	items: function() {
+		let u = ctx.usb_status(), r = u.reset;
+		let diagnosis = ctx.network_check_status();
+		let labels = {
+			no_controller:L('USB 控制器缺失','USB controller missing'),
+			usb_not_enumerated:L('电脑尚未识别 USB','USB not enumerated by computer'),
+			gadget_unbound:L('USB 设备尚未绑定','USB gadget not bound'),
+			usb_interface_missing:L('USB 网卡缺失','USB network interface missing'),
+			lan_missing:L('LAN 网桥缺失','LAN bridge missing'),
+			usb_not_bridged:L('USB 未加入 LAN','USB not attached to LAN'),
+			lan_no_ipv4:L('LAN 没有 IPv4 地址','LAN has no IPv4 address'),
+			dhcp_not_running:L('DHCP 服务未运行','DHCP server not running'),
+			wifi_not_running:L('热点尚未运行','Hotspot not running'),
+			wifi_firmware_missing:L('Wi-Fi 固件缺失','Wi-Fi firmware missing'),
+			regulatory_missing:L('无线管制数据库缺失','Regulatory database missing')
+		};
+		let checks = map(diagnosis?.checks ?? [], code => labels[code] ?? L(code,code));
+		let hardware_errors = filter(split(diagnosis?.details?.kernel_log ?? '', '\n'), line=>match(lc(line), /(failed|error|not found|timeout|wrong nth|power on wcn)/));
+		return [
+			{ id: 'check', type: 'action', label:L('一键检查连接','Check connections'), reload:true,
+			  note:L('检查 USB、热点、网桥和 DHCP 并保存报告，不改变网络配置','Check USB, Wi-Fi, LAN and DHCP; save a report without changing network settings') },
+			{ id: 'diagnosis', type:'info', label:L('检查结论','Check result'),
+			  value:diagnosis ? length(checks) ? L(join(map(checks,l=>l.zh),'；'),join(map(checks,l=>l.en),'; ')) : L('未发现异常','No issue detected') : '--',
+			  note:diagnosis?.report ?? null },
+			{ id: 'wireless_error', type:'info', label:L('热点原始报错','Wireless error'),
+			  value:join(map(type(diagnosis?.details?.native_errors)=='array' ? diagnosis.details.native_errors : [], e=>type(e)=='object' ? e.code ?? e.message ?? sprintf('%J',e) : `${e}`),'; ') || '--',
+			  note:L('无法联网时可拍下本页的检查结论和报错','If networking is unavailable, photograph the check result and error on this page') },
+			{ id:'hardware_error', type:'info', label:L('硬件原始报错','Hardware error'), value:length(hardware_errors) ? hardware_errors[length(hardware_errors)-1] : '--' },
+			{ id: 'controller', type: 'info', label: L('控制器状态', 'Controller state'), value: u.state ?? '--' },
+			{ id: 'host_address', type: 'info', label: L('电脑地址', 'Computer address'), value: u.ip ?? L('尚未获取地址', 'No address yet') },
+			{ id: 'reset_status', type: 'info', label: L('USB 重置结果', 'USB reset status'),
+			  busy: r.busy,
+			  value: r.busy ? L('正在修复…', 'Recovering…') : r.state == 'done' ? L('已重新枚举', 'Re-enumerated') : r.state == 'failed' ? L('修复失败', 'Recovery failed') : '--',
+			  note: r.message ? `${r.stage ?? ''}: ${r.message}` : null },
+			{ id: 'reset', type: 'action', label: L('重置 USB 连接', 'Reset USB connection'), confirm: true, reload: true,
+			  note: L('电脑的 USB 网络会短暂断开；重新识别设备并恢复 LAN/DHCP，保留网络设置', 'USB networking disconnects briefly; re-enumerate and restore LAN/DHCP while keeping network settings') }
+		];
+	},
+	set: function(id) { return id == 'reset' ? ctx.usb_reset_start() : id == 'check' ? ctx.network_check() : 'no such setting'; }
+};
+
 /* ---------- about ---------- */
 
 const about = {
@@ -594,6 +637,6 @@ return [ network, { id: 'at', label: L('AT 指令', 'AT commands'), view: 'at' }
          { id: 'appmgr', label: L('应用管理', 'Apps'), view: 'apps' },
          ...(ctx.run('command -v bluetoothctl >/dev/null 2>&1') == 0
              ? [ { id: 'bluetooth', label: L('蓝牙', 'Bluetooth'), view: 'bluetooth' } ] : []),
-         charge, notify, ...(has_sound ? [ sound ] : []), screen, system_cat, about ];
+         charge, notify, ...(has_sound ? [ sound ] : []), screen, usb_cat, system_cat, about ];
 
 };

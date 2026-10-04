@@ -98,10 +98,20 @@ and removes plugins, and **Info screen settings** edits the screen's UCI options
 The apps page also accepts an official `e5-infoscreen-<version>.tar.gz` update
 package and installs it with the same archive checks as the on-screen updater.
 
-The current core release is `1.6.3` (API 2). Its XKB rules give the physical
+The current core release is `1.6.4` (API 2). Its XKB rules give the physical
 menu, call, confirm and `#` keys distinct browser events; unknown keys never
 activate the focused control. Phone navigation follows the visible keypad
 grid: up/down move within a column and left/right within a row.
+
+Settings → USB offers **Check connections** and **Reset USB connection**.
+The check reads USB enumeration, Wi-Fi, LAN, DHCP and relevant logs without
+changing network settings. Results appear on the panel and are saved in
+`/etc/e5-infoscreen/diagnostics/network.json`; photograph the results when the
+device cannot be reached. LuCI's Info screen settings can also run the check
+and download its report. Wi-Fi credentials are removed from the report.
+USB recovery briefly disconnects the computer, restores the bridge/DHCP path
+and re-enumerates the gadget while preserving settings. Errors identify the
+failed stage. An AP startup that exceeds 30 seconds is shown as failed.
 
 The project page is [`enceka.github.io/infoscreen`](https://enceka.github.io/infoscreen/).
 It reads the same `latest.json` as the device updater and links to the Pages-hosted

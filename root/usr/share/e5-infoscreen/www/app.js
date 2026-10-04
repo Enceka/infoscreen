@@ -44,7 +44,7 @@ const I18N = {
 		no_modem: '无模组', no_sim: '无 SIM 卡', searching: '搜索网络',
 		charging: '充电中', full: '已充满', discharging: '使用电池', not_charging: '未充电',
 		none: '无', wifi: 'Wi-Fi', usb: 'USB', unnamed: '未命名',
-		hotspot_on: '已开启', hotspot_off: '已关闭', hotspot_starting: '启动中',
+		hotspot_on: '已开启', hotspot_off: '已关闭', hotspot_starting: '启动中', hotspot_failed: '未启动', usb_resetting: 'USB 修复已启动',
 		reconnecting: '正在重新连接…', turning_on: '正在开启热点…', turning_off: '正在关闭热点…',
 		roaming: '漫游', devices: '台',
 		excellent: '极好', good: '好', fair: '一般', weak: '弱', poor: '差'
@@ -83,7 +83,7 @@ const I18N = {
 		no_modem: 'No modem', no_sim: 'No SIM', searching: 'Searching',
 		charging: 'Charging', full: 'Full', discharging: 'On battery', not_charging: 'Not charging',
 		none: 'None', wifi: 'Wi-Fi', usb: 'USB', unnamed: 'unnamed',
-		hotspot_on: 'On', hotspot_off: 'Off', hotspot_starting: 'Starting',
+		hotspot_on: 'On', hotspot_off: 'Off', hotspot_starting: 'Starting', hotspot_failed: 'Not running', usb_resetting: 'USB recovery started',
 		reconnecting: 'Reconnecting…', turning_on: 'Turning the hotspot on…', turning_off: 'Turning the hotspot off…',
 		roaming: 'Roaming', devices: '',
 		excellent: 'Excellent', good: 'Good', fair: 'Fair', weak: 'Weak', poor: 'Poor'
@@ -275,7 +275,7 @@ function renderOverview(st) {
 	setHTML('ov-wan', `<span class="${cls}">${esc(word)}</span>` + (st.modem.tech && st.wan.up ? ` · ${techName(st.modem.tech)}` : '') + (fam ? ` · ${fam}` : ''));
 
 	const w = st.wifi;
-	const ws = w.enabled ? (w.up ? t('hotspot_on') : t('hotspot_starting')) : t('hotspot_off');
+	const ws = w.enabled ? (w.up ? t('hotspot_on') : t(w.state == 'failed' ? 'hotspot_failed' : 'hotspot_starting')) : t('hotspot_off');
 	setHTML('ov-wifi', `<span class="${w.enabled && w.up ? 'ok' : w.enabled ? 'warn' : ''}">${esc(ws)}</span>` + (w.ssid ? ` · ${esc(w.ssid)}` : ''));
 
 	const nw = st.clients.filter((c) => c.via == 'wifi').length, nu = st.clients.filter((c) => c.via == 'usb').length;
@@ -354,11 +354,11 @@ async function renderHotspot(st) {
 	const btn = $('hs-toggle');
 	setText('hs-toggle', on ? t('on') : t('off'));
 	btn.classList.toggle('on', on);
-	if (wifiPending != null && wifiPending == w.enabled && (!w.enabled || w.up))
+	if (wifiPending != null && wifiPending == w.enabled && (!w.enabled || w.up || w.state == 'failed'))
 		wifiPending = null;
 
 	$('hs-qr').classList.toggle('off', !(w.enabled && w.up));
-	$('hs-qr').dataset.off = w.enabled ? t('hs_down') : t('hs_off');
+	$('hs-qr').dataset.off = w.error || (w.enabled ? t('hs_down') : t('hs_off'));
 	const qrKey = JSON.stringify([w.ssid, w.secured, w.hidden, w.qr_revision]);
 	if (w.ssid && qrFor !== qrKey) {
 		qrFor = qrKey;
@@ -1284,12 +1284,20 @@ async function stPost(v, body) {
 	const r = await fetch('/api/settings/' + v.cat.id, {
 		method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 	}).then((r) => r.json()).catch(() => null);
-	toast(r?.ok ? t('saved') : `${t('failed')}${r?.error ? ': ' + r.error : ''}`);
+	toast(r?.ok ? (v.cat.id == 'usb' && body.id == 'reset' ? t('usb_resetting') : t('saved')) : `${t('failed')}${r?.error ? ': ' + r.error : ''}`);
 	if (r?.item) {
 		const i = v.items.findIndex((x) => x.id == r.item.id);
 		if (i >= 0) v.items[i] = r.item;
 	}
 	if (r?.ok && r.item?.reload) stLoadCat(v);
+	if (r?.ok && v.cat.id == 'usb' && body.id == 'reset') {
+		const refresh = async () => {
+			if (!st.includes(v)) return;
+			await stLoadCat(v);
+			if (v.items?.find(i => i.id == 'reset_status')?.busy) setTimeout(refresh, 2000);
+		};
+		setTimeout(refresh, 2000);
+	}
 	if (r?.ok && v.cat.id == 'screen') stScreenApplied(body.id, r.item?.value ?? body.value);
 	if (r?.ok && v.cat.id == 'system' && body.id == 'clock_seconds' && last) {
 		last.screen.clock_seconds = !!body.value;
@@ -1824,7 +1832,11 @@ on('hs-toggle', 'click', async () => {
 	wifiPending = on;
 	toast(on ? t('turning_on') : t('turning_off'));
 	renderHotspot(last);
-	await post('wifi', { on });
+	const r = await post('wifi', { on });
+	if (!r?.ok) {
+		wifiPending = null;
+		toast(`${t('failed')}${r?.error ? ': ' + r.error : ''}`);
+	}
 	setTimeout(poll, 1500);
 });
 

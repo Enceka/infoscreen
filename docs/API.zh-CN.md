@@ -284,6 +284,13 @@ tar -czf nettest-1.0.tar.gz -C www/plugins nettest     # 或：cd www/plugins &&
 （接了电脑但没被识别，e5-linux 的 `e5-usb-watch` 会在插拔后重新连上）、`enumerated`（电脑已识别）、
 `lease`（电脑已拿到地址）、`online`（电脑正在通过 E5 上网，流量超过 2 KB/s）。
 
+`usb.reset` 返回修复能力、`busy`、`state`、`stage`、`message` 和 `updated`。
+向 `POST /settings/usb` 提交 `{ "id": "reset" }` 开始修复；提交 `{ "id": "check" }`
+执行只读连接检查并保存报告，`GET /settings/usb` 显示检查结论和修复结果。
+LuCI 通过已认证的 `e5-infoscreen.usb_reset`、`e5-infoscreen.network_check` RPC 调用。
+`wifi.state` 为 `off`、`on`、`starting` 或 `failed`；启动等待最多 30 秒，
+`wifi.error` 显示原始错误或超时原因。
+
 **应用商店**是 [`Enceka/infoscreen-plugins`](https://github.com/Enceka/infoscreen-plugins)：应用放在
 `plugins/<id>/`，CI（`tools/check.py`）检查 manifest、文件、风格和前端不许做的事，含后台的应用会标出来供审阅；
 通过后发布到 GitHub Pages（`index.json` 和每个应用一个包）。设备上 `plugin store` 获取索引

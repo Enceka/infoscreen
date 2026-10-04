@@ -148,6 +148,14 @@ rates the host's traffic on `usb0` (the E5's view: `tx` is what the host downloa
 not enumerated -- e5-linux's `e5-usb-watch` connects it again after a replug),
 `enumerated`, `lease` (the host has an address), `online` (its traffic over 2 KB/s).
 
+`usb.reset` reports recovery availability, `busy`, `state`, `stage`, `message`
+and `updated`. `POST /settings/usb` with `{ "id": "reset" }` queues recovery;
+`{ "id": "check" }` runs read-only connection diagnostics and saves the report.
+`GET /settings/usb` shows its conclusions and recovery result. LuCI exposes
+authenticated `e5-infoscreen.usb_reset` and `e5-infoscreen.network_check` RPCs.
+`wifi.state` is `off`, `on`, `starting` or `failed`; pending startup is bounded
+to 30 seconds and `wifi.error` carries the native error or timeout reason.
+
 ## 3. Settings items
 
 A category's `items` are drawn by type; a plugin's settings use the same shape.

@@ -59,6 +59,20 @@ return {
 				unlink(UPDATE_UPLOAD);
 				return { ok: r.rc == 0, message: r.out };
 			}
+		},
+		usb_reset: {
+			call: function() {
+				let r = run('/usr/libexec/e5-infoscreen/usb-reset start');
+				return { ok: r.rc == 0, message: r.out };
+			}
+		},
+		network_check: {
+			call: function() {
+				let r = run('ucode /usr/libexec/e5-infoscreen/net-check.uc');
+				let report;
+				try { report = json(r.out); } catch (e) {}
+				return { ok: r.rc == 0 && !!report?.ok, report, message: report?.error ?? r.out };
+			}
 		}
 	}
 };

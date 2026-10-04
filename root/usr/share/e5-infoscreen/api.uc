@@ -353,10 +353,26 @@ function wifi_config() {
 function wifi_status() {
 	let cfg = wifi_config();
 	let st = ubus_call('network.wireless', 'status')?.radio0;
+	let up = (st?.up ?? false) && length(st?.interfaces ?? []) > 0;
+	let request = state_get('wifi-request');
+	let wanted_pending = !!st?.pending || !!(request?.on && time() - request.at < 30);
+	let observed = state_get('wifi-start');
+	if (cfg.enabled && !up && wanted_pending && (!observed || observed.revision != cfg.qr_revision)) {
+		observed = { at: time(), revision: cfg.qr_revision };
+		state_put('wifi-start', observed);
+	}
+	if ((!cfg.enabled || up) && observed) state_put('wifi-start', null);
+	let errors = [];
+	for (let e in (type(st?.errors) == 'array' ? st.errors : []))
+		push(errors, type(e) == 'object' ? (e.code ?? e.message ?? sprintf('%J', e)) : `${e}`);
+	let pending = wanted_pending && observed && time() - observed.at < 30 && !length(errors) && !st?.retry_setup_failed;
 	return {
 		ssid: cfg.ssid,
 		enabled: cfg.enabled,
-		up: (st?.up ?? false) && length(st?.interfaces ?? []) > 0,
+		up,
+		pending,
+		state: !cfg.enabled ? 'off' : up ? 'on' : pending ? 'starting' : 'failed',
+		error: !cfg.enabled || up || pending ? null : join('; ', errors) || (!st ? 'Wireless status unavailable' : wanted_pending ? 'Wireless startup timed out' : 'Wireless interface did not start'),
 		channel: cfg.channel,
 		band: cfg.band,
 		secured: cfg.secured,
@@ -453,7 +469,34 @@ function usb_status() {
 			link = (port == 'DCP') ? 'charger' : 'host';
 	}
 	return { cable, port, state, speed: udc ? read_trim(udc + '/current_speed') : null,
-	         ip, rx_rate, tx_rate, link };
+	         ip, rx_rate, tx_rate, link,
+	         reset: usb_reset_status() };
+}
+
+function usb_reset_status() {
+	const r = '/tmp/run/e5-usb-reset/';
+	return { available: stat('/usr/libexec/e5-infoscreen/usb-reset') != null,
+		busy: stat(r + 'lock') != null,
+		state: read_trim(r + 'state'), stage: read_trim(r + 'stage'),
+		message: read_trim(r + 'message'), updated: read_num(r + 'updated') };
+}
+
+function usb_reset_start() {
+	if (usb_reset_status().busy) return 'USB reset is already running';
+	let p = popen('/usr/libexec/e5-infoscreen/usb-reset start 2>&1');
+	let out = p ? p.read('all') : null;
+	let rc = p ? p.close() : -1;
+	return rc == 0 ? null : trim(out ?? 'Cannot start USB reset');
+}
+
+function network_check_status() {
+	try { return json(readfile('/etc/e5-infoscreen/diagnostics/network.json') ?? 'null'); }
+	catch (e) { return null; }
+}
+
+function network_check() {
+	let result = sh_json('ucode /usr/libexec/e5-infoscreen/net-check.uc');
+	return result?.ok ? null : result?.error ?? 'Network diagnostic check failed';
 }
 
 function battery() {
@@ -1005,6 +1048,7 @@ function make_ctx(ns) {
 		modem: modem_status,
 		modem_present: () => modem_status().present,
 		sim_card,
+		usb_status, usb_reset_start, network_check, network_check_status,
 		cells,
 		lte_bands, nr_bands, cell_locks,
 		NR_V1, NR_V3, NR_SUPER
@@ -1301,6 +1345,8 @@ function set_wifi(on) {
 	c.set('wireless', 'radio0', 'disabled', on ? '0' : '1');
 	c.set('wireless', 'default_radio0', 'disabled', on ? '0' : '1');
 	c.commit('wireless');
+	state_put('wifi-request', { on, at: time() });
+	state_put('wifi-start', null);
 	// hostapd takes seconds to come up or go
 	system('(wifi reload) >/dev/null 2>&1 &');
 	return true;

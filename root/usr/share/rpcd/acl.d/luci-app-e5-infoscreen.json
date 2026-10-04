@@ -8,7 +8,7 @@
 		},
 		"write": {
 			"ubus": {
-			"e5-infoscreen": [ "install", "remove", "update_install" ]
+				"e5-infoscreen": [ "install", "remove", "update_install", "usb_reset", "network_check" ]
 			},
 			"uci": [ "e5-infoscreen" ],
 			"file": {

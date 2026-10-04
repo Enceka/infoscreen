@@ -3,6 +3,6 @@
 #   version    版本号，点分，须比设备上已有的新
 #   notes_zh   发布说明（中文）
 #   notes_en   release notes (English)；留空则用中文
-version=1.6.4
-notes_zh=新增信息屏和 LuCI 的 USB 连接重置、一键连接诊断与报告下载；修复结果显示具体阶段，热点启动超时或失败时显示错误。
-notes_en=Add USB recovery, one-click network diagnostics and report download in the info screen and LuCI; report recovery stages and hotspot startup timeouts or errors.
+version=1.6.5
+notes_zh=完善一键连接诊断：日志服务不可用时仍返回完整报告；包含 USB 重置、设备端检查结论和热点启动失败提示。
+notes_en=Keep network diagnostic reports valid when logging services are unavailable; includes USB recovery, on-device check results and hotspot startup errors.

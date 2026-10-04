@@ -3,7 +3,9 @@
 import { readfile, writefile, mkdir, stat, popen } from 'fs';
 
 function command(cmd) {
-	let p=popen(`${cmd} 2>&1`), out=p ? p.read('all') : '';
+	// Group pipelines so failures from logread/dmesg stay inside the report,
+	// rather than being printed before its JSON and breaking RPC parsing.
+	let p=popen(`(${cmd}) 2>&1`), out=p ? p.read('all') : '';
 	return { output:trim(out ?? ''), rc:p ? p.close() : -1 };
 }
 function redact(value) {

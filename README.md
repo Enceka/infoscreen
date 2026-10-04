@@ -98,7 +98,7 @@ and removes plugins, and **Info screen settings** edits the screen's UCI options
 The apps page also accepts an official `e5-infoscreen-<version>.tar.gz` update
 package and installs it with the same archive checks as the on-screen updater.
 
-The current core release is `1.6.4` (API 2). Its XKB rules give the physical
+The current core release is `1.6.5` (API 2). Its XKB rules give the physical
 menu, call, confirm and `#` keys distinct browser events; unknown keys never
 activate the focused control. Phone navigation follows the visible keypad
 grid: up/down move within a column and left/right within a row.

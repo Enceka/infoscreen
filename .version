@@ -3,6 +3,6 @@
 #   version    版本号，点分，须比设备上已有的新
 #   notes_zh   发布说明（中文）
 #   notes_en   release notes (English)；留空则用中文
-version=1.6.5
-notes_zh=完善一键连接诊断：日志服务不可用时仍返回完整报告；包含 USB 重置、设备端检查结论和热点启动失败提示。
-notes_en=Keep network diagnostic reports valid when logging services are unavailable; includes USB recovery, on-device check results and hotspot startup errors.
+version=1.6.6
+notes_zh=修复 USB 状态函数的定义顺序，恢复信息屏取数；修正连接诊断日志与结论的文本拼接，增加真实 API 请求回归检查。
+notes_en=Fix USB status function definition order to restore screen data; correct diagnostic text joining and add real API request regression checks.

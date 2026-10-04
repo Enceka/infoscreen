@@ -16,7 +16,7 @@ let categories=loadfile('/usr/share/e5-infoscreen/settings.uc',{raw_mode:true})(
 let usb=filter(categories,c=>c.id=='usb')[0];assert(usb,'USB category missing');
 let items=usb.items();assert(filter(items,i=>i.id=='reset'&&i.confirm&&i.reload)[0],'recovery action missing');
 assert(filter(items,i=>i.id=='check')[0],'read-only check action missing');
-assert(index(filter(items,i=>i.id=='diagnosis')[0].value.zh,'DHCP')>=0,'diagnosis not shown');
+assert(filter(items,i=>i.id=='diagnosis')[0].value.zh=='电脑尚未识别 USB；DHCP 服务未运行','diagnosis not shown');
 assert(started==0,'reading settings reset hardware');
 assert(usb.set('reset')==null&&started==1,'button did not queue recovery');
 error='USB controller unavailable';assert(usb.set('reset')==error,'error was hidden');

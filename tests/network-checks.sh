@@ -31,6 +31,7 @@ docker run --rm -v "$T/share":/usr/share/e5-infoscreen:ro \
     -v "$T/tests":/tests:ro -v "$T":/test \
     "${E5_TEST_IMAGE:-e5-openwrt-base:25.12.5}" \
     sh -ec 'ucode /tests/usb-settings.uc; ucode /tests/wifi-status.uc;
+        ucode /tests/network-api.uc;
         PATH=/test/bin:$PATH ucode /helpers/net-check.uc > /test/report.json;
         ! grep -q must-not-appear /test/report.json;
         grep -q NO_RADIO /test/report.json;

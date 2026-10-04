@@ -431,6 +431,15 @@ function clients() {
 // and its traffic.  link: none | charger | host (a computer's port, the gadget
 // not enumerated) | enumerated | lease | online (the host's traffic through
 // the E5, over 2 KB/s)
+function usb_reset_status() {
+	const r = '/tmp/run/e5-usb-reset/';
+	return { available: stat('/usr/libexec/e5-infoscreen/usb-reset') != null,
+		busy: stat(r + 'lock') != null,
+		state: read_trim(r + 'state'), stage: read_trim(r + 'stage'),
+		message: read_trim(r + 'message'), updated: read_num(r + 'updated') };
+}
+
+
 function usb_status() {
 	let cable = false;
 	for (let e in glob('/sys/class/extcon/*/state'))
@@ -473,13 +482,6 @@ function usb_status() {
 	         reset: usb_reset_status() };
 }
 
-function usb_reset_status() {
-	const r = '/tmp/run/e5-usb-reset/';
-	return { available: stat('/usr/libexec/e5-infoscreen/usb-reset') != null,
-		busy: stat(r + 'lock') != null,
-		state: read_trim(r + 'state'), stage: read_trim(r + 'stage'),
-		message: read_trim(r + 'message'), updated: read_num(r + 'updated') };
-}
 
 function usb_reset_start() {
 	if (usb_reset_status().busy) return 'USB reset is already running';

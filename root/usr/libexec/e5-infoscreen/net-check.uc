@@ -17,8 +17,8 @@ function redact(value) {
 	return out;
 }
 function logs(cmd) {
-	return join(map(split(command(cmd).output,'\n'), line =>
-		match(lc(line), /(password|passphrase|psk=|key=)/) ? '[authentication detail omitted]' : line), '\n');
+	return join('\n', map(split(command(cmd).output,'\n'), line =>
+		match(lc(line), /(password|passphrase|psk=|key=)/) ? '[authentication detail omitted]' : line));
 }
 function trimmed(path) { return trim(readfile(path) ?? ''); }
 

@@ -622,6 +622,9 @@ function screen_config() {
 
 /* ---------- SMS ---------- */
 
+const SMS_TOOL = '/usr/libexec/e5-sms';
+const SMS_RECEIVE = '/usr/libexec/e5-sms-receive';
+
 function sms_unread() {
 	let ids = [];
 	for (let line in split(readfile(SMS_UNREAD) ?? '', '\n')) {
@@ -653,6 +656,10 @@ function sms_one(cache, id) {
 }
 
 function sms_list() {
+	if (stat(SMS_RECEIVE)) {
+		let r = sh_json(`${SMS_TOOL} list 2>/dev/null`);
+		if (r) return filter(r.messages ?? [], m => m.direction != 'out');
+	}
 	// (mmcli names this list with one flat key, "modem.messaging.sms")
 	let lj = sh_json('mmcli -J -m any --timeout=5 --messaging-list-sms 2>/dev/null');
 	let paths = lj?.['modem.messaging.sms'] ?? lj?.modem?.messaging?.sms ?? [];
@@ -683,6 +690,8 @@ function sms_delete(id) {
 	id = int(id);
 	if (id < 0 || `${id}` == 'NaN')
 		return false;
+	if (id >= 1000000000 && stat(SMS_RECEIVE))
+		return sh_json(`${SMS_TOOL} delete ${id} 2>/dev/null`)?.ok ?? false;
 	let ok = system(`mmcli -m any --timeout=10 --messaging-delete-sms=${SMS_PATH}${id} >/dev/null 2>&1`) == 0;
 	if (ok) {
 		let cache = state_get('sms') ?? {};
@@ -696,7 +705,6 @@ function sms_delete(id) {
 }
 
 // e5-linux's /usr/libexec/e5-sms: the text in a file, not on a command line
-const SMS_TOOL = '/usr/libexec/e5-sms';
 
 function sms_send(number, text, card) {
 	number = `${number ?? ''}`;
@@ -711,7 +719,7 @@ function sms_send(number, text, card) {
 	let c = clock(true);
 	let f = `${RUN}/sms-send.${c[0]}${c[1]}`;
 	writefile(f, text);
-	// (card: the other one than the card in use is switched to first)
+	// (card selects this SMS only; the backend keeps the data SIM unchanged)
 	let cs = (card === 0 || card === 1 || card === '0' || card === '1') ? ` ${card}` : '';
 	let r = sh_json(`${SMS_TOOL} send '${replace(number, /[^+0-9]/g, '')}' '${f}'${cs} 2>/dev/null`);
 	system(`rm -f ${f}`);

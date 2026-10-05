@@ -22,3 +22,7 @@ covering successful enumeration and failures without touching USB hardware.
 in a disposable OpenWrt Docker image (`E5_TEST_IMAGE` overrides the image).
 `network-ui.cjs` uses the same Playwright setup to test the diagnostic button,
 recovery confirmation/result and failed hotspot display with mocked requests.
+
+`sms-ui.cjs` uses mocked dual-SIM messages to check origin labels, chronological
+notification selection, safe text rendering and multipart detail refresh.
+It never contacts a modem or sends SMS. Run with the same Playwright setup.

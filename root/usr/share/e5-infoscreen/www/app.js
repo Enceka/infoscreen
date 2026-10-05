@@ -878,6 +878,13 @@ async function loadSms() {
 		console.log('sms: ' + e);
 	}
 	renderSmsList();
+	if (smsOpen != null) {
+		const current = smsList.find(m => m.id == smsOpen);
+		if (current) {
+			setText('sv-time', [current.sim, fmtSmsTime(current.time)].filter(Boolean).join(' · '));
+			setText('sv-text', current.text ?? '');
+		}
+	}
 	return smsList;
 }
 
@@ -887,7 +894,7 @@ function renderSmsList() {
 	setHTML('sms-list', smsList.length ? smsList.map((m) =>
 		`<button class="smsitem${m.unread || unread.has(m.id) ? ' unread' : ''}" data-sms="${m.id}">` +
 		`<div class="top"><span class="from">${esc(m.number ?? t('unknown_sender'))}</span>` +
-		`<span class="when">${esc(fmtSmsTime(m.time))}</span></div>` +
+		`<span class="when">${esc(m.sim ?? '')} · ${esc(fmtSmsTime(m.time))}</span></div>` +
 		`<div class="preview">${esc((m.text ?? '').replace(/\s+/g, ' '))}</div></button>`
 	).join('') : `<div class="card sub">${esc(t('no_sms'))}</div>`);
 	if (focusedId) {
@@ -901,7 +908,7 @@ function openSms(id) {
 	if (!m) return;
 	smsOpen = m.id;
 	setText('sv-from', m.number ?? t('unknown_sender'));
-	setText('sv-time', fmtSmsTime(m.time));
+	setText('sv-time', [m.sim, fmtSmsTime(m.time)].filter(Boolean).join(' · '));
 	setText('sv-text', m.text ?? '');
 	disarmDelete();
 	$('sms-list').hidden = true;
@@ -946,14 +953,16 @@ async function smsCheck(st) {
 	const fresh = now.filter((id) => !before.includes(id));
 	if (!fresh.length) {
 		if (page == P.sms && !blank && smsOpen == null && now.length != before.length) loadSms();
+		if (page == P.sms && !blank && smsList.find(m => m.id == smsOpen)?.state == 'receiving') loadSms();
 		return;
 	}
 	if (!st.sms.screen || locked) return;
 	if (blank) setBlank(false);
-	toast(t('new_sms'));
 	if (page != P.sms) showPage(P.sms);
 	await loadSms();
-	openSms(Math.max(...fresh));
+	const newest = smsList.find(m => fresh.includes(m.id));
+	toast(t('new_sms') + (newest?.sim ? ' · ' + newest.sim : ''));
+	if (newest) openSms(newest.id);
 	markSmsRead();
 }
 

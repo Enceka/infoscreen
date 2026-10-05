@@ -3,6 +3,6 @@
 #   version    版本号，点分，须比设备上已有的新
 #   notes_zh   发布说明（中文）
 #   notes_en   release notes (English)；留空则用中文
-version=1.6.6
-notes_zh=修复 USB 状态函数的定义顺序，恢复信息屏取数；修正连接诊断日志与结论的文本拼接，增加真实 API 请求回归检查。
-notes_en=Fix USB status function definition order to restore screen data; correct diagnostic text joining and add real API request regression checks.
+version=1.6.7
+notes_zh=接入双卡短信收件箱，列表、详情和提醒显示来源 SIM；新短信按时间选择，接收中的长短信自动刷新。
+notes_en=Integrate the dual-SIM inbox with source SIM labels in messages and alerts, chronological notification selection and live multipart updates.

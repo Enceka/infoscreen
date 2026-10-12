@@ -16,7 +16,12 @@ window.T551MTransport = (() => {
         current.onmessage=event=>{
             if(socket!==current)return;
             try {
-                const value=JSON.parse(event.data), item=pending.get(value.id);
+                const value=JSON.parse(event.data);
+                if(value.event==='power-supply-change') {
+                    window.dispatchEvent(new Event('e5-power-supply-change'));
+                    return;
+                }
+                const item=pending.get(value.id);
                 if(!item)return;
                 if(value.fallback || !Number.isInteger(value.status) || value.status<200 || value.status>599 || typeof value.body!=='string')
                     item.finish(unavailable());

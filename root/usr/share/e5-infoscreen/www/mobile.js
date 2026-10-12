@@ -320,6 +320,13 @@ window.T551M = (() => {
         if (screenLocked && !dark) usage();
     }
     let supplyOnline = null;
+    window.addEventListener('e5-power-supply-change', () => {
+        if (!mounted) return;
+        // The kernel catches quick swaps between two status polls. Reuse the
+        // normal wake path so the lock, touch preference and idle timer agree.
+        if (blank) setBlank(false);
+        else resetIdle();
+    });
     function status(data) {
         if (!mounted) return;
         syncTrafficPicker();

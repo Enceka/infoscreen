@@ -3,6 +3,7 @@ import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import threading
 from playwright.sync_api import sync_playwright
@@ -22,7 +23,7 @@ def main():
     try:
         with sync_playwright() as p:
             chrome=Path('C:/Program Files/Google/Chrome/Application/chrome.exe')
-            browser=p.chromium.launch(**({'executable_path':str(chrome)} if chrome.exists() else {}))
+            browser=p.chromium.launch(**({'executable_path':os.environ.get('E5_TEST_BROWSER', str(chrome))} if os.environ.get('E5_TEST_BROWSER') or chrome.exists() else {}))
             page=browser.new_page(viewport={'width':320,'height':480},has_touch=True)
             errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
             def api(route):
@@ -39,6 +40,14 @@ def main():
             page.wait_for_timeout(300)
             def poll():page.evaluate('poll()');page.wait_for_timeout(250)
             def dark():page.evaluate('setBlank(true)');page.wait_for_timeout(200)
+            # A quick unplug/replug leaves the next status sample unchanged.
+            # Both kernel transitions must wake without waiting for that poll.
+            for _ in range(2):
+                dark()
+                page.evaluate("window.dispatchEvent(new Event('e5-power-supply-change'))")
+                page.wait_for_timeout(200)
+                assert page.evaluate('!blank && T551M.isLocked()')
+                assert state['screen']['awake']
             for online in [True,False,True,False]:
                 dark();state['battery']['online']=online;poll()
                 assert page.evaluate('!blank && T551M.isLocked()')

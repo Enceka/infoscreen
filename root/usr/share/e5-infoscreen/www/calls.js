@@ -19,8 +19,9 @@ window.T551MCalls = (() => {
             },{capture:true,passive:false});
     }
     function update(data) {
-        if(data.error || !Array.isArray(data.calls))return;
-        const calls=data.calls.filter(c=>live.has(c.state));
+        const removed=data.phone_installed===false;
+        if(!removed && (data.error || !Array.isArray(data.calls)))return;
+        const calls=removed?[]:data.calls.filter(c=>live.has(c.state));
         const incoming=calls.filter(c=>c.state==='ringing-in'||c.state==='waiting');
         const fresh=incoming.some(c=>!ringing.has(String(c.id)));
         ringing=new Set(incoming.map(c=>String(c.id)));
@@ -61,6 +62,9 @@ window.T551MCalls = (() => {
         const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),2500);
         try {
             const response=await fetch('/api/plugins/phone/live',{cache:'no-store',signal:controller.signal});
+            if(response.status===404 && !streaming && !stopped) {
+                deliver({phone_installed:false,calls:[]});return;
+            }
             const data=await response.json();
             if(response.ok && !streaming && !stopped)deliver(data);
         } catch(_) {} finally {
@@ -77,7 +81,7 @@ window.T551MCalls = (() => {
             stream.onmessage=event=>{
                 try {
                     const data=JSON.parse(event.data);
-                    if(data.error || !Array.isArray(data.calls)) {streaming=false;pollCalls();return;}
+                    if(data.phone_installed!==false && (data.error || !Array.isArray(data.calls))) {streaming=false;pollCalls();return;}
                     streaming=true;clearTimeout(pollTimer);pollTimer=null;deliver(data);
                 }catch(_) {streaming=false;pollCalls();}
             };

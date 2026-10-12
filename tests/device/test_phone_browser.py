@@ -61,7 +61,8 @@ def main():
         stream[0]=CallEvents()
         def publish():
             while not stop.wait(.02):
-                state={**model['audio'],'calls':model['calls'],'available':not bool(model.get('error')),'error':model.get('error')}
+                state={**model['audio'],'calls':model['calls'],'phone_installed':True,
+                       'available':not bool(model.get('error')),'error':model.get('error')}
                 stream[0].publish(state,model['wake'])
         threading.Thread(target=publish,daemon=True).start()
     server=ThreadingHTTPServer(('127.0.0.1',8088 if a.push else 0),partial(Handler,directory=str(a.webroot)))

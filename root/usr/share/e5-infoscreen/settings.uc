@@ -31,27 +31,6 @@ function control_slot() {
 }
 function lock_call(method,args) { return ctx.ubus('mu300dash',method,args) ?? {error:'Network service unavailable'}; }
 function band_list(text) { return filter(map(split(text ?? '',','),b=>int(b)),b=>b>0); }
-function apn_options() {
-	// e5-linux's e5-apn-auto: the APN from the SIM's operator
-	let seen = {}, out = [ { value: 'auto', label: L('自动（按 SIM 卡）', 'Automatic (from the SIM)') } ];
-	let add = (apn) => {
-		if (apn && apn != 'ims' && !seen[apn]) {
-			seen[apn] = true;
-			push(out, { value: apn, label: apn });
-		}
-	};
-	add(ctx.uci().get('network', 'wan', 'apn'));
-	// the contexts the modem holds (ims is the voice one)
-	let pl = ctx.sh_json('mmcli -J -m any --timeout=5 --3gpp-profile-manager-list 2>/dev/null');
-	for (let line in (pl?.modem?.['3gpp']?.['profile-manager']?.list ?? pl?.['modem.3gpp.profile-manager.list'] ?? [])) {
-		let m = match(line, /apn: ([^,]+)/);
-		if (m) add(trim(m[1]));
-	}
-	// and the ones listed for the switch: uci add_list e5-infoscreen.main.apn=<apn>
-	for (let a in (ctx.uci().get('e5-infoscreen', 'main', 'apn') ?? []))
-		add(a);
-	return out;
-}
 
 
 const network = {
@@ -82,9 +61,8 @@ const network = {
              value:c.get('e5-sim','main','card') ?? `${ctx.sim_card()}`,
              options:[{value:'0',label:'SIM 1'},{value:'1',label:'SIM 2'}],
              note:L('切换后重新连接网络','Reconnects after switching')},
-            {id:'apn',type:'choice',label:'APN',confirm:true,
-             value:c.get('network','wan','apn_auto') == '1' ? 'auto' : c.get('network','wan','apn'),options:apn_options(),
-             note:L('当前上网卡的 APN','APN for the current data SIM')},
+            {id:'apn',type:'category',category:'apn',label:L('接入点 APN','Access points (APN)'),
+             note:L('与网页共用，按当前上网卡保存','Shared with the web; saved for the current data SIM')},
             {id:'lock_state',type:'info',label:L('锁定状态','Lock status'),value:'SIM '+(int(slot)+1),
              note:data.error ?? L('与网页共用设置和开机回放','Shares settings and boot replay with the web dashboard')},
             {id:'lock_refresh',type:'action',label:L('刷新锁定状态','Refresh lock state')},
@@ -119,15 +97,6 @@ const network = {
             if (value != '0' && value != '1') return 'unknown card';
             ctx.forget('modem');
             return ctx.run(`(/usr/sbin/e5-sim ${value}) >/dev/null 2>&1 &`) == 0 ? null : 'Cannot start SIM switch';
-        }
-        if (id == 'apn') {
-            if (!length(filter(apn_options(),o=>o.value==value))) return 'unknown APN';
-            let c=ctx.uci();
-            if (value != 'auto') c.set('network','wan','apn',value);
-            c.set('network','wan','apn_auto',value == 'auto' ? '1':'0');
-            if (!c.commit('network')) return 'Cannot save APN';
-            ctx.run(value == 'auto' ? '(/usr/libexec/e5-apn-auto) >/dev/null 2>&1 &' : '(ifup wan) >/dev/null 2>&1 &');
-            return null;
         }
         if (id == 'reconnect') {ctx.forget('modem');ctx.run('(ifup wan) >/dev/null 2>&1 &');return null;}
         slot ??= control_slot();
@@ -707,7 +676,8 @@ const about = {
 
 // (the devices category is its own view: /api/devices)
 // (the AT page is its own view as well: /api/at, /api/at/presets)
-return [ network, { id: 'at', label: L('AT 指令', 'AT commands'), view: 'at' },
+return [ network, {id:'apn',parent:'network',label:L('接入点 APN','Access points (APN)'),view:'apn'},
+         { id: 'at', label: L('AT 指令', 'AT commands'), view: 'at' },
          { id: 'devices', label: L('设备管理', 'Devices'), view: 'devices' },
          { id: 'appmgr', label: L('应用管理', 'Apps'), view: 'apps' },
          ...(ctx.run('command -v bluetoothctl >/dev/null 2>&1') == 0

@@ -1606,6 +1606,17 @@ global.handle_request = function(env) {
 		}
 		if (!post && path == '/settings')
 			return reply_json(200, { categories: map(settings(), (c) => ({ id: c.id, label: c.label, view: c.view, plugin: c.plugin, parent: c.parent })) });
+		if (path == '/apn') {
+			let r;
+			if (post) {
+				let b = read_body(env);
+				if (!(b.action in ['save','delete','apply','auto']) || type(b.payload) != 'object')
+					return reply_json(400,{ok:false,error:'apn_invalid'});
+				r = ubus_call('mu300dash','apn_set',{action:b.action,payload:sprintf('%J',b.payload)});
+			} else r = ubus_call('mu300dash','apn_get',{});
+			r ??= {ok:false,error:'apn_unavailable'};
+			return reply_json(!post || r.ok ? 200 : 400,r);
+		}
 		if (!post && path == '/network-job') {
 			let a=query_args(env.QUERY_STRING ?? '');
 			if ((a.slot != '0' && a.slot != '1') || !match(a.id ?? '',/^[0-9a-f]{32}$/))

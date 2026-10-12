@@ -1043,6 +1043,7 @@ async function poll() {
 				resetIdle();
 			}
 			T551M.status(st);
+			stAPNSync(st);
 			applyTouch();
 			if (first) {
 				lang = st.screen.lang in I18N ? st.screen.lang : 'zh';
@@ -1848,6 +1849,8 @@ function stRender() {
 			v.items.map((it) => stRow('item:' + it.id, lbl(it.label), stValue(it),
 				{ info: it.type == 'info', on: it.type == 'toggle' && it.value, note: lbl(it.note),
 				  chev: ['choice', 'number', 'multi', 'image', 'category'].includes(it.type) })).join('');
+	} else if (v.view == 'apn' || v.view == 'apnedit') {
+		html = stAPNRender(v);
 	} else if (v.view == 'edit') {
 		const it = v.item;
 		if (it.type == 'choice') {
@@ -1937,6 +1940,7 @@ function stRender() {
 	}
 	const focused = document.activeElement?.dataset?.st;
 	setHTML('st-view', html);
+	if (v.view == 'apnedit') stAPNBind(v);
 	T551M.settings($('st-view'), v, stCats);
 	if (focused) {
 		const el = document.querySelector(`[data-st="${CSS.escape(focused)}"]`);
@@ -2021,6 +2025,7 @@ function stScreenApplied(id, value) {
 async function stClick(key, el) {
 	const v = stTop();
 	if (v?.saving || v?.parent?.saving) return;
+	if (v?.view == 'apn' || v?.view == 'apnedit') return stAPNClick(v,key,el);
 	const [k, arg] = [key.slice(0, key.indexOf(':')), key.slice(key.indexOf(':') + 1)];
 	if (k == 'atslot') {v.slot=String(1-+(v.slot ?? last?.modem?.sim_card ?? 0));stRender();return;}
 	if (k == 'atp' || k == 'atagain') {
@@ -2081,9 +2086,10 @@ async function stClick(key, el) {
 		if (it.type == 'category') {
 			const c = stCats.find(x => x.id == it.category);
 			if (!c) return;
-			const nv = {view:'cat',cat:c,items:null};
+			const nv = {view:c.view == 'apn' ? 'apn':'cat',cat:c,items:null};
 			st.push(nv); stRender();
-			await stLoadCat(nv);
+			if (nv.view == 'apn') await stAPNLoad(nv);
+			else await stLoadCat(nv);
 			return;
 		}
 		if (it.type == 'toggle') {

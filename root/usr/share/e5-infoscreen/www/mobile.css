@@ -385,3 +385,27 @@ body.compact { --stack-gap:8px; }
 #notification-body { margin:10px 0 14px; }
 .update-actions { gap:10px; }
 .update-actions .btn { min-width:0; padding:9px 7px; line-height:1.4; }
+/* Shared APN editor: compact touch targets and themed controls, no native select. */
+.apn-actions,.apn-choices { display:flex; flex-wrap:wrap; gap:8px; }
+.apn-actions { margin:10px 0; }
+.apn-button { min-height:38px; flex:1 1 auto; padding:8px 11px; white-space:normal; overflow-wrap:anywhere; }
+.apn-button.active { color:var(--accent); border-color:var(--accent); background:rgba(var(--active-rgb),.15); }
+.apn-button:disabled { opacity:.45; }
+.apn-profile,.apn-summary,.apn-editor { margin-top:12px; padding:14px; min-width:0; }
+.apn-profile.current { border:1px solid var(--accent); }
+.apn-profile-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.apn-profile strong,.apn-value,.apn-summary b { min-width:0; overflow-wrap:anywhere; }
+.apn-profile .sub { margin-top:6px; }
+.apn-value { margin-top:8px; }
+.apn-badge { flex-shrink:0; color:var(--accent); font-size:11px; }
+.apn-summary { display:flex; flex-direction:column; gap:6px; }
+.apn-summary>span { color:var(--dim); font-size:12px; }
+.apn-editor fieldset { border:0; padding:0; margin:0; min-width:0; }
+.apn-field { display:flex; flex-direction:column; gap:7px; margin-bottom:14px; min-width:0; }
+.apn-field>span { color:var(--dim); font-size:12px; }
+.apn-field input { box-sizing:border-box; width:100%; min-width:0; min-height:40px; padding:9px 10px; border:1px solid var(--line); border-radius:10px; background:rgba(var(--surface-rgb),var(--ui-opacity,.7)); color:var(--text); font:inherit; }
+.apn-field input:focus { outline:2px solid var(--accent); outline-offset:1px; }
+.apn-choices .apn-button { flex:1 1 40%; }
+.apn-clear { display:flex; gap:8px; align-items:center; font-size:12px; margin:8px 0 14px; }
+.apn-clear input { margin:0; accent-color:var(--accent); }
+.apn-error { color:var(--poor); }

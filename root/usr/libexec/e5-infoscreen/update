@@ -27,6 +27,13 @@ MAX_BYTES=20971520
 
 die() { echo "error: $*" >&2; exit 1; }
 current() { cat "$VF" 2>/dev/null || echo 0; }
+compatible_archive() {
+	marker=usr/share/e5-infoscreen/ADAPTATION
+	[ -s "/$marker" ] || return 0
+	expected=$(cat "/$marker")
+	actual=$(tar -xzOf "$1" "$marker" 2>/dev/null || tar -xzOf "$1" "./$marker" 2>/dev/null || true)
+	[ "$actual" = "$expected" ] || die "This package does not include the device UI integration; use a compatible firmware/update package"
+}
 # true when dotted version $1 is newer than $2
 newer() {
 	awk -v a="$1" -v b="$2" 'BEGIN { n = split(a, x, "."); m = split(b, y, "."); k = n > m ? n : m
@@ -62,6 +69,7 @@ do_fetch() {
 install_archive() {
 	archive=$1
 	[ -f "$archive" ] || die "no such package"
+	compatible_archive "$archive"
 	[ "$(wc -c < "$archive")" -le "$MAX_BYTES" ] || die "the package is too big"
 	T=$(mktemp -d /tmp/e5-update.XXXXXX) || die "no temporary directory"
 	tar -tzvf "$archive" > "$T/list" 2>/dev/null || die "not a tar.gz"
@@ -102,6 +110,7 @@ do_apply() {
 
 do_rollback() {
 	[ -f "$BACKUP" ] || die "no backup: no update was installed"
+	compatible_archive "$BACKUP"
 	tar -xzf "$BACKUP" -C / || die "restoring failed"
 	echo "back to $(current)"
 	rm -f "$BACKUP" "$STATE"

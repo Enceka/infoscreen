@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>E5</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="mobile.css">
 </head>
 <body>
 <header id="bar">
@@ -68,8 +69,8 @@
 			<div id="sg-op" class="sub">--</div>
 		</div>
 		<div class="card meter"><div class="mh"><span>RSRP</span><span id="sg-rsrp">--</span></div><div class="track"><div id="sg-rsrp-bar"></div></div></div>
-		<div class="card meter"><div class="mh"><span>RSRQ</span><span id="sg-rsrq">--</span></div><div class="track"><div id="sg-rsrq-bar"></div></div></div>
 		<div class="card meter"><div class="mh"><span>SINR</span><span id="sg-sinr">--</span></div><div class="track"><div id="sg-sinr-bar"></div></div></div>
+		<div class="card meter"><div class="mh"><span>RSRQ</span><span id="sg-rsrq">--</span></div><div class="track"><div id="sg-rsrq-bar"></div></div></div>
 		<div class="card grid">
 			<span class="label">PCI</span><span id="sg-pci" class="value">--</span>
 			<span class="label">ARFCN</span><span id="sg-arfcn" class="value">--</span>
@@ -79,8 +80,13 @@
 		</div>
 	</section>
 
-	<!-- traffic: today, this month, the last days (vnstat) -->
+	<!-- Shared per-SIM usage history; choosing a view does not switch data SIM. -->
 	<section class="page" data-title="traffic">
+		<div class="card traffic-scope">
+			<label for="tf-slot" data-t="traffic_view"></label>
+			<div class="traffic-select"><select id="tf-slot"><option value="" data-t="traffic_data_sim"></option><option value="0">SIM 1</option><option value="1">SIM 2</option></select></div>
+			<div id="tf-state" class="sub" role="status"></div>
+		</div>
 		<div class="card">
 			<div class="lh"><span data-t="today"></span></div>
 			<div class="tr"><span class="lbl2" data-t="wan"></span><span class="arrow">↓</span><span id="tf-day-rx" class="mid">--</span><span class="arrow up">↑</span><span id="tf-day-tx" class="mid">--</span></div>
@@ -96,6 +102,7 @@
 		<div class="card">
 			<div class="lh"><span data-t="since_boot"></span> · <span data-t="wan"></span></div>
 			<div class="tr"><span class="arrow">↓</span><span id="tf-boot-rx" class="mid">--</span><span class="arrow up">↑</span><span id="tf-boot-tx" class="mid">--</span></div>
+			<div class="sub" data-t="traffic_session_note"></div>
 		</div>
 		<div class="card">
 			<div class="lh"><span data-t="last_days"></span> · <span data-t="wan"></span></div>
@@ -115,6 +122,7 @@
 				<button id="sv-back" class="btn" data-t="back"></button>
 				<button id="sv-delete" class="btn danger" data-t="delete"></button>
 			</div>
+			<div class="sub" data-t="sms_delete_note"></div>
 		</div>
 	</section>
 
@@ -163,7 +171,7 @@
 		</div>
 	</section>
 	<!-- advanced information: details, read-only -->
-	<section class="page" data-title="adv_info">
+	<section class="page" data-title="adv_info"><div id="ad-freshness" hidden></div>
 		<div class="card grid">
 			<span class="label sect" data-t="device"></span><span></span>
 			<span class="label" data-t="model"></span><span id="ad-model" class="value">--</span>
@@ -254,7 +262,11 @@
 
 <div id="blank"></div>
 <div id="toast"></div>
-<div id="vol-osd"><span data-t="volume"></span><div class="track"><div id="vol-bar"></div></div><span id="vol-n"></span></div>
+<div id="vol-osd"><span id="vol-label" data-t="volume"></span><div class="track"><div id="vol-bar"></div></div><span id="vol-n"></span></div>
+<script src="transport.js"></script>
+<script src="power-menu.js"></script>
+<script src="mobile.js"></script>
+<script src="calls.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

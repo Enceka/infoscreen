@@ -1,5 +1,10 @@
 # e5-infoscreen
 
+The shared mobile UI and screen services for E5, T551M and M8 are now integrated here.
+See [device integration](docs/DEVICE-INTEGRATION.md) for source commits, compatibility and runtime dependencies.
+The parent project uses this repository as a pinned submodule; `tools/stage.py --root DIR` installs committed assets into an offline root.
+
+
 > 中文：[`README.zh-CN.md`](README.zh-CN.md)
 
 An info screen for the Rongyue E5's 320×480 panel under OpenWrt, the OpenWrt

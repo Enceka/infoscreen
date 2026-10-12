@@ -1,0 +1,1 @@
+{"admin/services/e5-infoscreen/navigation": {"title": "底部导航", "order": 14, "action": {"type": "view", "path": "e5-infoscreen/navigation"}, "depends": {"acl": ["luci-app-e5-infoscreen"]}}, "admin/services/e5-infoscreen/wallpapers": {"title": "屏幕壁纸", "order": 15, "action": {"type": "view", "path": "e5-infoscreen/wallpapers"}, "depends": {"acl": ["luci-app-t551m-screen"]}}}

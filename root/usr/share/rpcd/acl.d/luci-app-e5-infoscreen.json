@@ -1,20 +1,38 @@
 {
-	"luci-app-e5-infoscreen": {
-		"description": "Grant access to the info screen's apps (list, install, uninstall)",
-		"read": {
-			"ubus": {
-			"e5-infoscreen": [ "list", "version" ]
-			}
-		},
-		"write": {
-			"ubus": {
-				"e5-infoscreen": [ "install", "remove", "update_install", "usb_reset", "network_check" ]
-			},
-			"uci": [ "e5-infoscreen" ],
-			"file": {
-				"/tmp/e5-plugin.upload": [ "write" ],
-				"/tmp/e5-infoscreen.update.upload": [ "write" ]
-			}
-		}
-	}
+  "luci-app-e5-infoscreen": {
+    "description": "Grant access to the info screen's apps (list, install, uninstall)",
+    "read": {
+      "ubus": {
+        "e5-infoscreen": [
+          "list",
+          "version"
+        ]
+      },
+      "uci": [
+        "e5-infoscreen"
+      ]
+    },
+    "write": {
+      "ubus": {
+        "e5-infoscreen": [
+          "install",
+          "remove",
+          "update_install",
+          "usb_reset",
+          "network_check"
+        ]
+      },
+      "uci": [
+        "e5-infoscreen"
+      ],
+      "file": {
+        "/tmp/e5-plugin.upload": [
+          "write"
+        ],
+        "/tmp/e5-infoscreen.update.upload": [
+          "write"
+        ]
+      }
+    }
+  }
 }

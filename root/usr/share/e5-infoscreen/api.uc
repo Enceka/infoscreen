@@ -14,7 +14,7 @@
 //   POST /api/sms-read       the messages have been seen (e5-sms-notify read)
 //   POST /api/sms-delete     {"id": N}
 //   POST /api/sms-send       {"number": "...", "text": "...", "card": 0|1} -> {ok, error} (e5-linux's e5-sms)
-//   GET  /api/traffic        today's, this month's and the last days' traffic (vnstat)
+//   GET  /api/traffic        shared SIM traffic ledger (?slot=0|1; default data SIM)
 //   POST /api/at             {"cmd": "AT+...", "timeout": s} -> {ok, reply|error}
 //   GET  /api/at/presets     the screen's list of AT reads
 //   GET  /api/advanced       device, baseband and SIM details, band and cell locks
@@ -38,6 +38,7 @@
 import { readfile, writefile, popen, open, stat, glob, lsdir, lstat } from 'fs';
 import { connect } from 'ubus';
 import { cursor } from 'uci';
+import * as hotspot from '/usr/libexec/unisoc-modem/hotspot.uc';
 
 const WLAN_DEV = 'wlan0';
 const USB_HOST_MAC = '02:50:00:00:e5:02';   // the gadget's host_addr
@@ -334,25 +335,12 @@ function wan_status() {
 }
 
 function wifi_config() {
-	let c = cursor();
-	let encryption = c.get('wireless', 'default_radio0', 'encryption');
-	return {
-		ssid: c.get('wireless', 'default_radio0', 'ssid'),
-		key: c.get('wireless', 'default_radio0', 'key'),
-		encryption,
-		secured: encryption != null && encryption != 'none',
-		hidden: c.get('wireless', 'default_radio0', 'hidden') == '1',
-		qr_revision: stat('/etc/config/wireless')?.mtime ?? 0,
-		enabled: c.get('wireless', 'radio0', 'disabled') != '1' &&
-			c.get('wireless', 'default_radio0', 'disabled') != '1',
-		channel: c.get('wireless', 'radio0', 'channel'),
-		band: c.get('wireless', 'radio0', 'band')
-	};
+	return hotspot.config(cursor());
 }
 
 function wifi_status() {
 	let cfg = wifi_config();
-	let st = ubus_call('network.wireless', 'status')?.radio0;
+	let st = ubus_call('network.wireless', 'status')?.[cfg.radio];
 	let up = (st?.up ?? false) && length(st?.interfaces ?? []) > 0;
 	let request = state_get('wifi-request');
 	let wanted_pending = !!st?.pending || !!(request?.on && time() - request.at < 30);
@@ -440,8 +428,45 @@ function usb_reset_status() {
 }
 
 
+function usb_devices() {
+	let devices = [];
+	for (let p in glob('/sys/bus/usb/devices/*/idVendor')) {
+		let d = replace(p, /\/idVendor$/, '');
+		let vendor = read_trim(p), product = read_trim(d + '/idProduct');
+		// A device can disappear while this snapshot is being read.
+		if (!vendor || !product || read_trim(d + '/bDeviceClass') == '09') continue;
+		let interfaces = [];
+		// Network adapters often use vendor-specific USB classes. Inspect the
+		// registered interfaces, including devices behind nested dock hubs.
+		for (let n in glob(d + ':*/net/*'))
+			if (read_trim(n + '/type') == '1' && !stat(n + '/phy80211'))
+				push(interfaces, split(n, '/')[-1]);
+		push(devices, { id: split(d, '/')[-1],
+			name: read_trim(d + '/product') || read_trim(d + '/manufacturer') || 'USB',
+			kind: length(interfaces) ? 'ethernet' : 'device', interfaces,
+			vendor, product });
+	}
+	return devices;
+}
+
 function usb_status() {
 	let cable = false;
+	let role = 'none', policy = 'auto', devices = usb_devices();
+	let role_node = glob('/sys/bus/platform/devices/*/usb_role_policy')[0];
+	if (role_node) {
+		policy = read_trim(role_node) || 'auto';
+		role = read_trim(replace(role_node, /usb_role_policy$/, 'usb_role')) || 'none';
+	} else {
+		// DWC3 uses the standard role-switch ABI, without the MUSB policy file.
+		for (let p in glob('/sys/class/usb_role/*/role'))
+			if (read_trim(p) == 'host') role = 'host';
+		// Some automatic-only role switches intentionally hide the role file.
+		for (let p in glob('/sys/class/extcon/*/state'))
+			if (match(readfile(p) ?? '', /(^|\n)USB-HOST=1/)) role = 'host';
+		if (role != 'host')
+			for (let p in glob('/sys/class/udc/*/state'))
+				if (read_trim(p) == 'configured') role = 'device';
+	}
 	for (let e in glob('/sys/class/extcon/*/state'))
 		if (match(readfile(e) ?? '', /(^|\n)USB=1/))
 			cable = true;
@@ -477,8 +502,9 @@ function usb_status() {
 		else
 			link = (port == 'DCP') ? 'charger' : 'host';
 	}
+	if (role == 'host') link = 'otg';
 	return { cable, port, state, speed: udc ? read_trim(udc + '/current_speed') : null,
-	         ip, rx_rate, tx_rate, link,
+	         ip, rx_rate, tx_rate, link, role, policy, devices,
 	         reset: usb_reset_status() };
 }
 
@@ -609,6 +635,30 @@ function backlight_path() {
 function screen_config() {
 	let c = cursor();
 	return {
+		status_bar: c.get('e5-infoscreen', 'main', 'status_bar') != '0',
+		awake: (read_num(backlight_path() + '/brightness') ?? 0) > 0,
+		lock_wallpaper: c.get('e5-infoscreen', 'main', 'lock_wallpaper') ?? 'default',
+		lock_wallpaper_rev: c.get('e5-infoscreen', 'main', 'lock_wallpaper_rev') ?? '',
+		desktop_wallpaper: c.get('e5-infoscreen', 'main', 'desktop_wallpaper') ?? 'default',
+		desktop_wallpaper_rev: c.get('e5-infoscreen', 'main', 'desktop_wallpaper_rev') ?? '',
+		nav_bar: c.get('e5-infoscreen', 'main', 'nav_bar') != '0',
+		ui_size: c.get('e5-infoscreen', 'main', 'ui_size') ?? 'standard',
+		speed_unit: (c.get('e5-infoscreen', 'main', 'speed_unit') == 'mbs' || c.get('e5-infoscreen', 'main', 'speed_unit') == 'auto' || c.get('e5-infoscreen', 'main', 'speed_unit') == 'bytes') ? 'bytes' : 'bits',
+		ui_theme: c.get('e5-infoscreen', 'main', 'ui_theme') ?? 'dark',
+		ui_opacity: +(c.get('e5-infoscreen', 'main', 'ui_opacity') ?? 70),
+		ui_accent: c.get('e5-infoscreen', 'main', 'ui_accent') ?? 'mint',
+		ui_density: c.get('e5-infoscreen', 'main', 'ui_density') ?? 'comfortable',
+		ui_motion: c.get('e5-infoscreen', 'main', 'ui_motion') != '0',
+		lock_enabled: c.get('e5-infoscreen', 'main', 'lock_enabled') != '0',
+		lock_daily: c.get('e5-infoscreen', 'main', 'lock_daily') != '0',
+		lock_monthly: c.get('e5-infoscreen', 'main', 'lock_monthly') != '0',
+		lock_speed: c.get('e5-infoscreen', 'main', 'lock_speed') != '0',
+		unlock_distance: c.get('e5-infoscreen', 'main', 'unlock_distance') ?? 'standard',
+        nav_slot1: c.get('e5-infoscreen', 'main', 'nav_slot1') ?? '0',
+		nav_slot2: c.get('e5-infoscreen', 'main', 'nav_slot2') ?? '1',
+		nav_slot3: c.get('e5-infoscreen', 'main', 'nav_slot3') ?? '2',
+		nav_slot4: c.get('e5-infoscreen', 'main', 'nav_slot4') ?? '3',
+		nav_slot5: c.get('e5-infoscreen', 'main', 'nav_slot5') ?? '7',
 		idle: +(c.get('e5-infoscreen', 'main', 'idle') ?? 60),
 		brightness: +(c.get('e5-infoscreen', 'main', 'brightness') ?? 120),
 		clock_seconds: c.get('e5-infoscreen', 'main', 'clock_seconds') == '1',
@@ -626,10 +676,11 @@ const SMS_TOOL = '/usr/libexec/e5-sms';
 const SMS_RECEIVE = '/usr/libexec/e5-sms-receive';
 
 function sms_unread() {
-	let ids = [];
+	let ids = [], hidden=[];
+	try {hidden=json(readfile('/etc/unisoc-modem/hidden-sms.json') ?? '[]');} catch(e) {}
 	for (let line in split(readfile(SMS_UNREAD) ?? '', '\n')) {
 		let m = match(line, /\/SMS\/([0-9]+)$/);
-		if (m)
+		if (m && index(hidden,+m[1])<0)
 			push(ids, +m[1]);
 	}
 	return ids;
@@ -687,21 +738,9 @@ function sms_list() {
 }
 
 function sms_delete(id) {
-	id = int(id);
-	if (id < 0 || `${id}` == 'NaN')
-		return false;
-	if (id >= 1000000000 && stat(SMS_RECEIVE))
-		return sh_json(`${SMS_TOOL} delete ${id} 2>/dev/null`)?.ok ?? false;
-	let ok = system(`mmcli -m any --timeout=10 --messaging-delete-sms=${SMS_PATH}${id} >/dev/null 2>&1`) == 0;
-	if (ok) {
-		let cache = state_get('sms') ?? {};
-		delete cache[id];
-		state_put('sms', cache);
-		// and out of the unread list
-		let rest = filter(split(readfile(SMS_UNREAD) ?? '', '\n'), (l) => l != '' && l != `${SMS_PATH}${id}`);
-		writefile(SMS_UNREAD, length(rest) ? join('\n', rest) + '\n' : '');
-	}
-	return ok;
+    if (!match(`${id}`,/^[0-9]+$/)) return false;
+    // Same local-pool deletion as LuCI; SIM deletion remains an explicit web action.
+    return ubus_call('mu300dash','sms_delete',{id:`${id}`,sim:'0'})?.ok ?? false;
 }
 
 // e5-linux's /usr/libexec/e5-sms: the text in a file, not on a command line
@@ -728,63 +767,24 @@ function sms_send(number, text, card) {
 
 /* ---------- traffic ---------- */
 
-// vnstat's day and month counters (bytes): wan = the modem's interface,
-// lan = the bridge of the USB port and the hotspot
-function traffic_iface(dev) {
-	let v = sh_json(`vnstat --json -i ${dev} 2>/dev/null`);
-	let tr = v?.interfaces?.[0]?.traffic;
-	if (!tr)
-		return { available: false };
-	let lt = localtime();
-	let pick = (list, match_fn) => {
-		for (let e in (list ?? []))
-			if (match_fn(e.date))
-				return { rx: e.rx, tx: e.tx };
-		return { rx: 0, tx: 0 };
-	};
-	let days = [];
-	for (let e in slice(tr.day ?? [], -7))
-		push(days, { date: sprintf('%02d-%02d', e.date.month, e.date.day), rx: e.rx, tx: e.tx });
-	return {
-		available: true,
-		// when counting began: a month (or a day) that started earlier is partial
-		since: v.interfaces[0].created?.timestamp,
-		today: pick(tr.day, (d) => d.year == lt.year && d.month == lt.mon && d.day == lt.mday),
-		month: pick(tr.month, (d) => d.year == lt.year && d.month == lt.mon),
-		total: { rx: tr.total?.rx ?? 0, tx: tr.total?.tx ?? 0 },
-		days
-	};
-}
-
-function traffic_usage() {
-	let wan = traffic_iface(wan_dev());
-	// (the WAN's fields at the top level too, as in the first version)
-	return { ...wan, wan, lan: traffic_iface('br-lan') };
+function traffic_usage(slot) {
+	if (slot != null && slot != '' && slot != '0' && slot != '1')
+		return {available:false,error:'invalid_slot',source:'unisoc.traffic'};
+	slot = slot == null || slot == '' ? sim_card() : int(slot);
+	let data = ubus_call('unisoc.traffic', 'get', {slot:`${slot}`});
+	let s = data?.status;
+	// History remains readable when a SIM's network interface is absent.
+	let wan = s ? {
+		...s, available:!!s.clock_ok, interface_available:!!s.available,
+		slot, since:s.started_at, total:s.period, source:'unisoc.traffic',
+		days:map(reverse(slice(data.days ?? [],0,7)),d=>({date:substr(d.date,5),rx:d.rx,tx:d.tx}))
+	} : {available:false,slot,source:'unisoc.traffic',error:'traffic_unavailable'};
+	let net = `/sys/class/net/${slot == 1 ? 'sipa_eth8' : 'sipa_eth0'}/statistics/`;
+	wan.session = {rx:read_num(net + 'rx_bytes'),tx:read_num(net + 'tx_bytes')};
+	return { ...wan, wan, lan: { available:false } };
 }
 
 /* ---------- advanced ---------- */
-
-// mmcli prints  response: '<reply>'  and the reply has line breaks in it
-// (a chained command answers once per part): taken between the first
-// "response: '" and the last quote -- ucode's regex has no dot-all
-function at_reply(out) {
-	let i = index(out ?? '', "response: '");
-	let j = rindex(out ?? '', "'");
-	if (i < 0 || j <= i + 11)
-		return (i >= 0) ? '' : null;
-	return trim(replace(substr(out, i + 11, j - i - 11), /\r/g, ''));
-}
-
-// an AT command through ModemManager (the AT channel has one owner); the
-// reply without the final OK, or null.  The command is single-quoted for the
-// shell: a ' in it cannot end the quoting.
-function at(cmd, timeout) {
-	let q = replace(`${cmd}`, /'/g, "'\\''");
-	let t = int(timeout ?? 10);
-	if (t < 1 || t > 60) t = 10;
-	return at_reply(sh(`mmcli -m any --timeout=${t} --command='${q}' 2>&1`));
-}
-
 
 // warned about, not refused (e5-linux's e5-at warns the same way): the
 // commands after which the CP's AT server (ATZ, AT&F, AT+CPMS=) or the SIM
@@ -803,22 +803,25 @@ function at_warning(cmd) {
 
 // /api/at: the reply, or the modem's error text; `warning` marks a command
 // that can leave the modem's AT server or SIM dead until a reboot
-function at_console(cmd, timeout) {
-	let q = replace(`${cmd}`, /'/g, "'\\''");
-	let t = int(timeout ?? 10);
-	if (t < 1 || t > 60) t = 10;
-	let out = sh(`mmcli -m any --timeout=${t} --command='${q}' 2>&1`) ?? '';
-	let reply = at_reply(out);
-	let r = null;
-	if (reply != null)
-		r = { ok: true, reply };
-	else {
-		let i = index(out, 'error: ');
-		r = { ok: false, error: trim((i >= 0) ? substr(out, i + 7) : out) };
-	}
+function at_console(cmd, timeout, slot) {
+	slot ??= `${sim_card()}`;
+	if (slot != '0' && slot != '1') return {ok:false,error:'Invalid SIM slot'};
+	let r = ubus_call('mu300dash','at',{cmd,slot:`${slot}`}) ?? {ok:false,error:'AT service unavailable'};
 	if (at_warning(cmd))
 		r.warning = true;
 	return r;
+}
+
+// Internal queries use the same scoped owner, without filling user AT history.
+function at(cmd, timeout, slot) {
+    slot ??= sim_card();
+    if (slot != 0 && slot != 1) return null;
+    let q=replace(`${cmd}`, /'/g, "'\\''"), t=int(timeout ?? 8);
+    if (t<1 || t>60) t=8;
+    let p=popen(`MU300_SIM_SLOT=${slot} /usr/libexec/unisoc-modem/at -t ${t} '${q}' 2>/dev/null`);
+    if (!p) return null;
+    let text=trim(p.read('all') ?? ''), rc=p.close();
+    return rc==0 && match(text,/(^|\n)OK$/) ? trim(replace(text,/(^|\n)OK$/,'')) : null;
 }
 
 // useful reads for the screen's AT page; nothing here changes the modem
@@ -929,8 +932,8 @@ function mm_clean(v) {
 	return length(keep) ? join(' ', keep) : v;
 }
 
-function advanced() {
-	let cached = state_get('advanced', 30);
+function advanced_base() {
+	let cached = state_get('advanced-base-' + sim_card(), 30);
 	if (cached)
 		return cached;
 
@@ -950,14 +953,14 @@ function advanced() {
 			push(fw, { name: trim(substr(line, 0, i)), value: trim(substr(line, i + 1)) });
 	}
 
-	let lte = m ? lte_bands(at('AT+SPLBAND=0')) : [];
-	let nr = m ? nr_bands(at('AT+SPLBAND=3')) : [];
-	let card = m ? payload_ints(at('AT+SPACTCARD?'))[0] : null;
-	let sa = m ? payload_ints(at('AT+SP5GRAN?'))[0] : null;
+	let lte = m ? lte_bands(null) : [];
+	let nr = m ? nr_bands(null) : [];
+	let card = m ? payload_ints(null)[0] : null;
+	let sa = m ? payload_ints(null)[0] : null;
 
 	let r = {
 		device: {
-			model: 'Rongyue E5',
+			model: ubus_call('system', 'board')?.model ?? null,
 			os: rel.DISTRIB_DESCRIPTION,
 			image: read_trim('/etc/e5/image-version'),
 			kernel: read_trim('/proc/sys/kernel/osrelease'),
@@ -978,8 +981,8 @@ function advanced() {
 			// empty = no lock (every band allowed)
 			lte_lock: lte,
 			nr_lock: nr,
-			lte_cell_lock: cell_locks(at('AT+SPFORCEFRQ=12,3')),
-			nr_cell_lock: cell_locks(at('AT+SPFORCEFRQ=16,3'))
+			lte_cell_lock: cell_locks(null),
+			nr_cell_lock: cell_locks(null)
 		} : null,
 		sim: m ? {
 			present: mm_val(g.sim) != null,
@@ -990,7 +993,26 @@ function advanced() {
 			operator: mm_val(g3['operator-name'])
 		} : null
 	};
-	state_put('advanced', r);
+	state_put('advanced-base-' + sim_card(), r);
+	return r;
+}
+
+// Metadata renders immediately; the AT owner pool refreshes radio data in the
+// background. Read the radio cache every request, independently of metadata TTL.
+function advanced() {
+	let r = advanced_base();
+	let radio = sh_json('/usr/libexec/t551m-screen-details');
+	let v = radio?.values ?? {};
+	if (r.baseband) {
+		r.baseband.lte_lock = v.lte ? lte_bands(v.lte) : null;
+		r.baseband.nr_lock = v.nr ? nr_bands(v.nr) : null;
+		r.baseband.sa_allowed = v.sa ? payload_ints(v.sa)[0] == 1 : null;
+		r.baseband.lte_cell_lock = v.lte_cell ? cell_locks(v.lte_cell) : null;
+		r.baseband.nr_cell_lock = v.nr_cell ? cell_locks(v.nr_cell) : null;
+	}
+	if (r.sim) r.sim.active_slot = sim_card() + 1;
+	r.radio_pending = radio?.pending ?? true;
+	r.radio_error = radio?.error ?? false;
 	return r;
 }
 
@@ -1297,21 +1319,71 @@ function sms_config() {
 function qos_status(m) {
 	if (!m?.present)
 		return null;
-	let c = state_get('qos', 60);
+	let slot = sim_card(), key = 'qos-' + slot;
+	let c = state_get(key, 60);
 	if (c)
 		return c.v;
 	let nr = (m.tech == '5gnr');
-	let f = payload_ints(at(nr ? 'AT+C5GQOSRDP=1' : 'AT+CGEQOSRDP=1', 5));
+	let f = payload_ints(at(nr ? 'AT+C5GQOSRDP=1' : 'AT+CGEQOSRDP=1', 5, slot));
+	if (sim_card() != slot) return null;
 	let v = (length(f) >= 8 && f[0] == 1 && (f[6] > 0 || f[7] > 0))
 		? { qci: f[1], dl_kbps: f[6], ul_kbps: f[7], nr } : null;
-	state_put('qos', { v });
+	state_put(key, { v });
 	return v;
+}
+
+// Independent card readings, refreshed outside the HTTP request path.
+function sim_status() {
+	let data = null;
+	try { data = json(readfile('/run/t551m-sims.json') ?? 'null'); } catch (e) {}
+	let now = +(split(readfile('/proc/uptime') ?? '0', ' ')[0]);
+	let active = sim_card();
+	return map([0,1], slot => {
+		let s = data?.sims?.[slot];
+		if (s == null || s.slot != slot || now - s.updated > 15 || now < s.updated)
+			return { slot, data: slot == active, registration: 'unknown', stale: true, signal: {} };
+		return { ...s, data: slot == active, stale: false };
+	});
+}
+
+function card_modem(m, sims) {
+	let s = sims[sim_card()];
+	// Never borrow the standby card's access technology or signal from MM.
+	let r = { ...m, tech: s.tech, radio_label: s.radio_label, signal: { ...(s.signal ?? {}) }, quality: null,
+		registration: s.registration == 'camped' ? 'unknown' : s.registration };
+	if (r.cell?.type != (s.tech == '5gnr' ? '5gnr' : s.tech)) r.cell = null;
+	let cached = null;
+	try { cached = json(readfile('/tmp/unisoc-modem/sim' + sim_card() + '/sig.json') ?? readfile('/tmp/unisoc-modem/sig.json') ?? 'null'); } catch (e) {}
+	if (!s.stale && !s.error && cached?.card == sim_card() && !cached.error && !cached.partial && time()-cached.ts >= 0 && time()-cached.ts <= 10) {
+		// Same serving-NR > LTE/AcT decision as the dashboard; no MM bitmask.
+		if (cached.nr?.band) {
+			r.tech = '5gnr'; r.radio_label = cached.lte?.band ? '5G NSA' : '5G SA';
+		} else if (cached.lte?.band) {
+			r.tech = (s.act == 13 || s.act == 11 || s.act == 18 || s.act == 19) ? '5gnr' : (s.act >= 2 && s.act <= 6) ? 'umts' : 'lte';
+			r.radio_label = s.act == 13 ? '5G NSA' : r.tech == '5gnr' ? '5G' : r.tech == 'umts' ? '3G' : '4G';
+		}
+		let cell = cached.nr?.band ? cached.nr : cached.lte;
+		if (cell?.band) {
+			r.signal = { rsrp: cell.rsrp, rsrq: cell.rsrq,
+				snr: cell.sinr ?? (s.tech == r.tech ? s.signal?.snr : null) };
+			r.cell = { type: cached.nr?.band ? '5gnr' : 'lte', band: (cached.nr?.band ? 'n' : 'B') + cell.band,
+				pci: cell.pci, arfcn: cell.arfcn ?? cell.earfcn,
+				bandwidth_mhz: cell.bw ? +replace(cell.bw, 'M', '') : null };
+		}
+		s.tech = r.tech; s.radio_label = r.radio_label;
+	}
+	if (s.operator) r.operator = s.operator;
+	let rsrp = r.signal.rsrp;
+	if (rsrp != null) r.quality = max(0, min(100, (rsrp + 120) * 2.5));
+	return r;
 }
 
 function status() {
 	let lt = localtime(), t = time();
-	let m = modem_status();
+	let sims = sim_status();
+	let m = card_modem(modem_status(), sims);
 	return {
+		sims,
 		time: t,
 		// the device's offset from UTC in seconds: the page formats its times
 		// with it (WebKit has no zoneinfo here and would use UTC)
@@ -1326,7 +1398,8 @@ function status() {
 		usb: usb_status(),
 		system: system_status(),
 		screen: screen_config(),
-		sms: { unread: sms_unread(), ...sms_config() },
+		sms: { unread: sms_unread(),
+            hidden_revision: `${stat('/etc/unisoc-modem/hidden-sms.json')?.mtime ?? 0}:${stat('/etc/unisoc-modem/hidden-sms.json')?.size ?? 0}`, ...sms_config() },
 		notifications: app_notifications()
 	};
 }
@@ -1351,14 +1424,10 @@ function wifi_qr() {
 }
 
 function set_wifi(on) {
-	let c = cursor();
-	c.set('wireless', 'radio0', 'disabled', on ? '0' : '1');
-	c.set('wireless', 'default_radio0', 'disabled', on ? '0' : '1');
-	c.commit('wireless');
+	let r=hotspot.set(cursor(),on);
+	if (!r.ok) return false;
 	state_put('wifi-request', { on, at: time() });
 	state_put('wifi-start', null);
-	// hostapd takes seconds to come up or go
-	system('(wifi reload) >/dev/null 2>&1 &');
 	return true;
 }
 
@@ -1376,7 +1445,7 @@ function set_backlight(level, save) {
 		c.set('e5-infoscreen', 'main', 'brightness', `${level}`);
 		c.commit('e5-infoscreen');
 	}
-	return writefile(p + '/brightness', `${level}\n`) != null;
+	return system(`/usr/libexec/t551m-screen-power set ${level}`) == 0;
 }
 
 /* ---------- Bluetooth (bluetoothd; e5-linux's e5-bt and e5-bt-connect) ---------- */
@@ -1536,7 +1605,13 @@ global.handle_request = function(env) {
 			return reply_json(r.ok ? 200 : 400, r);
 		}
 		if (!post && path == '/settings')
-			return reply_json(200, { categories: map(settings(), (c) => ({ id: c.id, label: c.label, view: c.view, plugin: c.plugin })) });
+			return reply_json(200, { categories: map(settings(), (c) => ({ id: c.id, label: c.label, view: c.view, plugin: c.plugin, parent: c.parent })) });
+		if (!post && path == '/network-job') {
+			let a=query_args(env.QUERY_STRING ?? '');
+			if ((a.slot != '0' && a.slot != '1') || !match(a.id ?? '',/^[0-9a-f]{32}$/))
+				return reply_json(400,{ok:false,error:'Invalid network job'});
+			return reply_json(200,ubus_call('mu300dash','lock_status',a) ?? {ok:false,state:'error',error:'Network service unavailable'});
+		}
 		let sm = match(path, /^\/settings\/([a-z0-9:_-]+)$/);
 		if (sm) {
 			let c = category(sm[1]);
@@ -1545,7 +1620,9 @@ global.handle_request = function(env) {
 			if (!post)
 				return reply_json(200, { id: c.id, label: c.label, items: settings_items(c) });
 			let b = read_body(env);
-			let err = c.set(b.id, b.value);
+			let err = c.set(b.id, b.value, b.slot);
+			if (type(err) == 'object' && err.job)
+				return reply_json(200,{ok:true,pending:true,job:err.job,slot:err.slot});
 			let item = null;
 			for (let i in settings_items(c))
 				if (i.id == b.id) item = i;
@@ -1584,12 +1661,12 @@ global.handle_request = function(env) {
 			return plugin_request(env, pm[1], pm[2] ?? '', post ? read_body(env) : null);
 		if (post && path == '/at') {
 			let b = read_body(env);
-			return reply_json(200, at_console(b.cmd ?? '', b.timeout));
+			return reply_json(200, at_console(b.cmd ?? '', b.timeout, b.slot));
 		}
 		if (!post && path == '/at/presets')
 			return reply_json(200, { presets: map(AT_PRESETS, (p) => ({ cmd: p[0], label: { zh: p[1], en: p[2] } })) });
 		if (!post && path == '/traffic')
-			return reply_json(200, traffic_usage());
+			return reply_json(200, traffic_usage(query_args(env.QUERY_STRING ?? '').slot));
 		if (!post && path == '/advanced')
 			return reply_json(200, advanced());
 		if (!post && path == '/identity')
@@ -1635,7 +1712,7 @@ global.handle_request = function(env) {
 				arg = (b.level != null) ? `set ${int(b.level)}` : (+b.step > 0) ? 'up' : (+b.step < 0) ? 'down' : '';
 			}
 			let r = json(trim(sh(`/usr/libexec/e5-volume ${arg} 2>/dev/null`) ?? '') || 'null');
-			return reply_json(200, { available: true, ...(r ?? {}) });
+			return reply_json(200, { available: r != null, ...(r ?? {}) });
 		}
 		if (post && path == '/key')
 			return reply_json(200, { ok: log_key(read_body(env)) });

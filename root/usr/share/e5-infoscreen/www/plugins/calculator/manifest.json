@@ -1,9 +1,0 @@
-{
-	"id": "calculator",
-	"api_version": 1,
-	"version": "1.0",
-	"name": { "zh": "计算器", "en": "Calculator" },
-	"description": { "zh": "九键计算", "en": "Keypad arithmetic" },
-	"entry": "index.html",
-	"order": 20
-}

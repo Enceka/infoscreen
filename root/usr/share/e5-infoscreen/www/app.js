@@ -9,8 +9,517 @@
 // same again (keyLock).  The first start after an install shows the 赞赏码
 // once (picOpen); after that it is under 高级 -> 关于.
 
+/* BEGIN SHARED PLATFORM MESSAGES: stage.py also embeds these in the screen. */
+const PLATFORM_ERRORS = [
+  [
+    "CPU unavailable",
+    "CPU 状态暂不可用",
+    "CPU durumu kullanılamıyor"
+  ],
+  [
+    "CPU control unavailable",
+    "CPU 控制服务暂不可用",
+    "CPU denetim hizmeti kullanılamıyor"
+  ],
+  [
+    "Failed",
+    "操作失败",
+    "İşlem başarısız"
+  ],
+  [
+    "Invalid voltage profile",
+    "电压配置无效",
+    "Geçersiz voltaj profili"
+  ],
+  [
+    "Expected three voltage domains",
+    "电压配置必须包含三个供电域",
+    "Voltaj profili üç güç alanını içermelidir"
+  ],
+  [
+    "Voltage offset must be -50000..25000 uV in 3125 uV steps",
+    "电压偏移须在 -50 至 +25 mV 内，步进为 3.125 mV",
+    "Voltaj ofseti -50 ile +25 mV arasında, 3,125 mV adımlarla olmalıdır"
+  ],
+  [
+    "Unclean shutdown with custom voltage; restored factory voltage",
+    "自定义电压下出现异常关机，已恢复原厂电压",
+    "Özel voltajla beklenmeyen kapanma oldu; fabrika voltajı geri yüklendi"
+  ],
+  [
+    "Secure firmware voltage ABI is not verified",
+    "固件电压接口尚未验证",
+    "Güvenli ürün yazılımının voltaj arayüzü doğrulanmadı"
+  ],
+  [
+    "CPU driver failed to initialize; reboot to restore default voltage",
+    "CPU 驱动初始化失败，请重启恢复原厂电压",
+    "CPU sürücüsü başlatılamadı; fabrika voltajını geri yüklemek için yeniden başlatın"
+  ],
+  [
+    "Kernel did not accept ",
+    "内核未接受设置：",
+    "Çekirdek ayarı kabul etmedi: "
+  ],
+  [
+    "Expected an integer",
+    "请输入整数",
+    "Bir tam sayı girin"
+  ],
+  [
+    "Unknown CPU setting",
+    "未知的 CPU 设置",
+    "Bilinmeyen CPU ayarı"
+  ],
+  [
+    "Invalid persistence flag",
+    "开机应用选项无效",
+    "Geçersiz açılışta uygulama seçeneği"
+  ],
+  [
+    "Invalid CPU policy",
+    "CPU 调频域配置无效",
+    "Geçersiz CPU frekans alanı ayarı"
+  ],
+  [
+    "CPU policy missing or repeated",
+    "CPU 调频域缺失或重复",
+    "CPU frekans alanı eksik veya yinelenmiş"
+  ],
+  [
+    "Boot voltage adjustment unavailable for this kernel/firmware",
+    "当前内核或固件不支持开机电压调整",
+    "Bu çekirdek veya ürün yazılımında açılış voltajı ayarlanamıyor"
+  ],
+  [
+    "CPU topology changed; reset saved settings",
+    "CPU 拓扑已变化，请恢复默认设置",
+    "CPU topolojisi değişti; kayıtlı ayarları sıfırlayın"
+  ],
+  [
+    "Choose supported frequencies with minimum <= maximum",
+    "请选择支持的频率，最低频率不能高于最高频率",
+    "Desteklenen frekansları seçin; en düşük değer en yüksek değeri aşamaz"
+  ],
+  [
+    "Governor unavailable",
+    "所选调速器不可用",
+    "Seçilen frekans yöneticisi kullanılamıyor"
+  ],
+  [
+    "Invalid thermal setting",
+    "温控设置无效",
+    "Geçersiz sıcaklık ayarı"
+  ],
+  [
+    "CPU thermal zone unavailable or ambiguous",
+    "CPU 温区不可用或无法唯一确定",
+    "CPU sıcaklık bölgesi kullanılamıyor veya belirsiz"
+  ],
+  [
+    "Only writable passive CPU trips may be changed",
+    "只能修改可写的 CPU 被动温控阈值",
+    "Yalnızca yazılabilir pasif CPU sıcaklık eşikleri değiştirilebilir"
+  ],
+  [
+    "Temperature must use 1 C steps within the protected range",
+    "温度须在允许范围内按 1 °C 步进设置",
+    "Sıcaklık korunan aralıkta 1 °C adımlarla ayarlanmalıdır"
+  ],
+  [
+    "Passive trip temperatures must increase by at least 1 C",
+    "被动温控阈值须逐级至少升高 1 °C",
+    "Pasif sıcaklık eşikleri en az 1 °C artan sırada olmalıdır"
+  ],
+  [
+    "rollback failed: ",
+    "回退失败：",
+    "geri alma başarısız: "
+  ],
+  [
+    "Invalid frequency",
+    "频率无效",
+    "Geçersiz frekans"
+  ],
+  [
+    "Thermal zone unavailable",
+    "温区不可用",
+    "Sıcaklık bölgesi kullanılamıyor"
+  ],
+  [
+    "Unsupported CPU setting",
+    "不支持的 CPU 设置",
+    "Desteklenmeyen CPU ayarı"
+  ],
+  [
+    "Unknown operation",
+    "未知操作",
+    "Bilinmeyen işlem"
+  ],
+  [
+    "Cannot read the current data SIM",
+    "无法读取当前上网卡",
+    "Etkin internet SIM kartı okunamıyor"
+  ],
+  [
+    "Invalid SIM switch job",
+    "切卡任务无效",
+    "Geçersiz SIM değiştirme görevi"
+  ],
+  [
+    "SIM switch interrupted; check the current data SIM",
+    "切卡任务已中断，请检查当前上网卡",
+    "SIM değiştirme kesildi; etkin internet SIM kartını kontrol edin"
+  ],
+  [
+    "Data SIM changed; refresh before switching",
+    "上网卡已变化，请刷新后再切换",
+    "İnternet SIM kartı değişti; geçişten önce yenileyin"
+  ],
+  [
+    "System SIM switch failed",
+    "系统切卡失败",
+    "Sistemin SIM değiştirme işlemi başarısız"
+  ],
+  [
+    "Data SIM did not match the saved selection; refresh actual state",
+    "实际卡槽与保存值不一致，请刷新检查",
+    "Etkin SIM kayıtlı seçimle eşleşmiyor; mevcut durumu yenileyin"
+  ],
+  [
+    "Invalid SIM switch request",
+    "切卡请求无效",
+    "Geçersiz SIM değiştirme isteği"
+  ],
+  [
+    "Select a valid SIM slot",
+    "请选择有效的 SIM 卡槽",
+    "Geçerli bir SIM yuvası seçin"
+  ],
+  [
+    "Confirm the data SIM switch",
+    "请确认切换上网卡",
+    "İnternet SIM kartı değişikliğini onaylayın"
+  ],
+  [
+    "A data SIM switch is already running",
+    "正在切换上网卡，请稍后再试",
+    "İnternet SIM kartı zaten değiştiriliyor; lütfen bekleyin"
+  ],
+  [
+    "Invalid data SIM operation",
+    "上网卡操作无效",
+    "Geçersiz internet SIM işlemi"
+  ],
+  [
+    "Modem is busy; try again shortly",
+    "基带正忙，请稍后重试",
+    "Modem meşgul; biraz sonra yeniden deneyin"
+  ],
+  [
+    "Network service unavailable",
+    "网络控制服务暂不可用",
+    "Ağ denetim hizmeti kullanılamıyor"
+  ],
+  [
+    "Invalid SIM slot",
+    "SIM 卡槽无效",
+    "Geçersiz SIM yuvası"
+  ],
+  [
+    "Cannot save SIM selection",
+    "无法保存卡槽选择",
+    "SIM seçimi kaydedilemiyor"
+  ],
+  [
+    "Cannot start SIM switch",
+    "无法启动切卡任务",
+    "SIM değiştirme başlatılamıyor"
+  ],
+  [
+    "Cannot save APN",
+    "无法保存 APN",
+    "APN kaydedilemiyor"
+  ],
+  [
+    "Invalid band list",
+    "频段列表无效",
+    "Geçersiz bant listesi"
+  ],
+  [
+    "Invalid network setting",
+    "网络设置无效",
+    "Geçersiz ağ ayarı"
+  ],
+  [
+    "Cannot start network operation",
+    "无法启动网络设置任务",
+    "Ağ ayarı görevi başlatılamıyor"
+  ],
+  [
+    "Charge start must be lower than stop",
+    "充电启动阈值必须低于停止阈值",
+    "Şarj başlatma eşiği durdurma eşiğinden düşük olmalıdır"
+  ],
+  [
+    "Cannot save setting",
+    "无法保存设置",
+    "Ayar kaydedilemiyor"
+  ],
+  [
+    "Setting saved but apply failed",
+    "设置已保存，但应用失败",
+    "Ayar kaydedildi ancak uygulanamadı"
+  ],
+  [
+    "Cannot select Android",
+    "无法选择 Android 启动",
+    "Android açılışı seçilemiyor"
+  ],
+  [
+    "Current network mode cannot be combined with this NR setting",
+    "当前网络模式不支持该 5G 组网选项",
+    "Geçerli ağ modu bu NR ayarıyla birleştirilemiyor"
+  ],
+  [
+    "Default LTE bands did not survive reconnect",
+    "重连后 LTE 默认频段未保持，请刷新检查",
+    "Yeniden bağlantıdan sonra varsayılan LTE bantları korunmadı; yenileyin"
+  ],
+  [
+    "AT service unavailable",
+    "AT 服务暂不可用",
+    "AT hizmeti kullanılamıyor"
+  ],
+  [
+    "Invalid network job",
+    "网络设置任务无效",
+    "Geçersiz ağ ayarı görevi"
+  ],
+  [
+    "Invalid hotspot state",
+    "热点状态无效",
+    "Geçersiz erişim noktası durumu"
+  ],
+  [
+    "No hotspot configured",
+    "尚未配置热点",
+    "Erişim noktası yapılandırılmamış"
+  ],
+  [
+    "Cannot save hotspot setting",
+    "无法保存热点设置",
+    "Erişim noktası ayarı kaydedilemiyor"
+  ],
+  [
+    "An update task is already running",
+    "已有更新任务正在执行",
+    "Bir güncelleme görevi zaten çalışıyor"
+  ],
+  [
+    "Unknown update action",
+    "未知更新操作",
+    "Bilinmeyen güncelleme işlemi"
+  ],
+  [
+    "The release has changed; check again",
+    "更新版本已变化，请重新检查",
+    "Sürüm değişti; yeniden kontrol edin"
+  ],
+  [
+    "No update backup",
+    "没有可回退的更新备份",
+    "Geri dönülecek güncelleme yedeği yok"
+  ],
+  [
+    "Cannot start the update task",
+    "无法启动更新任务",
+    "Güncelleme görevi başlatılamıyor"
+  ],
+  [
+    "This package does not include the device UI integration; use a compatible firmware/update package",
+    "此更新包未包含设备界面适配，请使用兼容的固件或更新包",
+    "Bu paket cihaz arayüzü uyarlamasını içermiyor; uyumlu ürün yazılımı veya güncelleme paketi kullanın"
+  ],
+  [
+    "This app requires its device-integrated update; the generic package would replace platform features",
+    "此应用需要设备适配版本，通用包会覆盖平台功能",
+    "Bu uygulama cihaza uyarlanmış güncelleme gerektirir; genel paket platform özelliklerinin üzerine yazar"
+  ],
+  [
+    "Confirmation is required",
+    "需要确认此操作",
+    "Bu işlem için onay gerekiyor"
+  ],
+  [
+    "Could not save traffic records",
+    "流量记录保存失败",
+    "Veri kullanım kayıtları kaydedilemedi"
+  ],
+  [
+    "Traffic service unavailable",
+    "流量统计服务暂不可用",
+    "Veri kullanım hizmeti kullanılamıyor"
+  ],
+  [
+    "System clock is not synchronized",
+    "系统时间尚未同步",
+    "Sistem saati eşitlenmedi"
+  ],
+  [
+    "Invalid data SIM",
+    "上网卡无效",
+    "Geçersiz internet SIM kartı"
+  ],
+  [
+    "AT request timed out",
+    "AT 请求超时",
+    "AT isteği zaman aşımına uğradı"
+  ],
+  [
+    "expected response field missing",
+    "响应缺少预期字段",
+    "Yanıtta beklenen alan eksik"
+  ],
+  [
+    "invalid numeric response",
+    "响应数值无效",
+    "Yanıttaki sayısal değer geçersiz"
+  ],
+  [
+    "Unknown active SIM",
+    "无法确定当前 SIM 卡",
+    "Etkin SIM kartı belirlenemiyor"
+  ],
+  [
+    "Incomplete network mode response",
+    "网络模式响应不完整",
+    "Ağ modu yanıtı eksik"
+  ],
+  [
+    "Incomplete band mask response",
+    "频段掩码响应不完整",
+    "Bant maskesi yanıtı eksik"
+  ],
+  [
+    "Incomplete cell lock response",
+    "小区锁定响应不完整",
+    "Hücre kilidi yanıtı eksik"
+  ],
+  [
+    "Active SIM changed while reading; refresh again",
+    "读取时上网卡已变化，请重新刷新",
+    "Okuma sırasında etkin SIM değişti; yeniden yenileyin"
+  ],
+  [
+    "Requested NR band has no supported SPLBAND encoding",
+    "所选 NR 频段没有受支持的 SPLBAND 编码",
+    "Seçilen NR bandı için desteklenen SPLBAND kodlaması yok"
+  ],
+  [
+    "Unsupported band requested",
+    "请求的频段不受支持",
+    "İstenen bant desteklenmiyor"
+  ],
+  [
+    "Unacknowledged setting failed readback: ",
+    "设置未确认且回读失败：",
+    "Onaylanmayan ayar geri okunamadı: "
+  ],
+  [
+    "Modem readback does not match requested setting",
+    "基带回读与请求设置不一致",
+    "Modemden okunan değer istenen ayarla eşleşmiyor"
+  ],
+  [
+    "Active SIM changed during operation",
+    "操作期间上网卡已变化",
+    "İşlem sırasında etkin SIM değişti"
+  ],
+  [
+    "Setting accepted, but reconnect failed: ",
+    "设置已接受，但重连失败：",
+    "Ayar kabul edildi ancak yeniden bağlantı başarısız: "
+  ],
+  [
+    "Setting did not survive reconnect",
+    "重连后设置未保持",
+    "Ayar yeniden bağlantıdan sonra korunmadı"
+  ],
+  [
+    "Another network operation is still running",
+    "另一个网络操作仍在执行",
+    "Başka bir ağ işlemi hâlâ çalışıyor"
+  ],
+  [
+    "Invalid job ID",
+    "任务编号无效",
+    "Geçersiz görev kimliği"
+  ],
+  [
+    "Saved settings do not match modem readback: ",
+    "已保存设置与基带回读不一致：",
+    "Kayıtlı ayarlar modemden okunan değerlerle eşleşmiyor: "
+  ],
+  [
+    "Boot replay is only allowed before initial radio activation",
+    "开机回放只能在首次射频激活前执行",
+    "Açılış ayarları yalnızca ilk radyo etkinleştirmesinden önce uygulanabilir"
+  ],
+  [
+    "Unknown lock operation",
+    "未知锁定操作",
+    "Bilinmeyen kilitleme işlemi"
+  ],
+  [
+    "unknown card",
+    "未知 SIM 卡",
+    "Bilinmeyen SIM kartı"
+  ],
+  [
+    "unknown APN",
+    "未知 APN",
+    "Bilinmeyen APN"
+  ],
+  [
+    "Choose a SIM in Clear traffic records",
+    "请在“清空流量记录”中选择卡槽",
+    "Veri geçmişini temizle bölümünde bir SIM seçin"
+  ],
+  [
+    "Invalid USB setting",
+    "USB 设置无效",
+    "Geçersiz USB ayarı"
+  ],
+  [
+    "USB operation failed",
+    "USB 操作失败",
+    "USB işlemi başarısız"
+  ],
+  [
+    "no such setting",
+    "没有此设置项",
+    "Böyle bir ayar yok"
+  ]
+];
+const PLATFORM_CODES = {
+    invalid_slot:'Select a valid SIM slot', confirmation_required:'Confirmation is required',
+    storage_failed:'Could not save traffic records', traffic_unavailable:'Traffic service unavailable',
+    clock_unsynced:'System clock is not synchronized'
+};
+const PLATFORM_PATTERN = new RegExp(PLATFORM_ERRORS.map(row=>row[0]).sort((a,b)=>b.length-a.length).map(key=>key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'g');
+function errorText(value, language) {
+    let text = String(value ?? '');
+    text = PLATFORM_CODES[text] || text;
+    const column = language === 'zh' ? 1 : language === 'tr' ? 2 : 0;
+    return text.replace(PLATFORM_PATTERN, key=>PLATFORM_ERRORS.find(row=>row[0]===key)[column]);
+}
+
 const I18N = {
 	zh: {
+		sms_delete_note:'删除本地记录，与网页同步；SIM 原件保留。',
+		traffic_view:'查看流量',traffic_data_sim:'跟随数据卡',traffic_unavailable:'流量统计暂不可用',traffic_history:'网卡离线 · 历史记录仍可查看',traffic_clock:'系统时间尚未同步',traffic_storage:'流量记录保存失败',traffic_session_note:'网卡累计独立计数，清空历史不会重置网卡',traffic_cleared:'流量记录已清空',
+		call_volume: '通话音量',
 		overview: '概览', signal: '信号', sms: '短信', hotspot: '热点', device: '设备',
 		back: '返回', delete: '删除', delete_confirm: '再按一次删除', deleted: '已删除',
 		no_sms: '没有短信', unknown_sender: '未知号码', new_sms: '新短信',
@@ -50,6 +559,9 @@ const I18N = {
 		excellent: '极好', good: '好', fair: '一般', weak: '弱', poor: '差'
 	},
 	en: {
+		sms_delete_note:'Deletes the shared local record; keeps the SIM copy.',
+		traffic_view:'View usage',traffic_data_sim:'Follow data SIM',traffic_unavailable:'Usage unavailable',traffic_history:'Interface offline · History is available',traffic_clock:'Clock not synchronized',traffic_storage:'Could not save usage',traffic_session_note:'Live interface counters are separate from usage history',traffic_cleared:'Traffic history cleared',
+		call_volume: 'Call volume',
 		overview: 'Overview', signal: 'Signal', sms: 'Messages', hotspot: 'Hotspot', device: 'Device',
 		back: 'Back', delete: 'Delete', delete_confirm: 'Press again to delete', deleted: 'Deleted',
 		no_sms: 'No messages', unknown_sender: 'Unknown', new_sms: 'New message',
@@ -216,13 +728,15 @@ function wanWord(st) {
 function renderBar(st) {
 	const m = st.modem;
 	setText('bar-sim', m.sim_card == null ? '' : String(m.sim_card + 1));
-	setText('bar-op', m.operator ?? (m.present ? t('searching') : t('no_modem')));
+	setText('bar-op', T551M.operator(m.operator) ?? (m.present ? t('searching') : t('no_modem')));
 	const tech = $('bar-tech');
 	setText('bar-tech', m.tech ? techName(m.tech) : '--');
 	tech.classList.toggle('off', !st.wan.up);
 
-	const q = m.quality ?? 0;
-	const n = !m.present || m.quality == null ? 0 : q >= 75 ? 4 : q >= 50 ? 3 : q >= 25 ? 2 : q > 0 ? 1 : 0;
+	const inserted = (st.sims || []).filter(s => s.present === true);
+	const single = inserted.length === 1 ? inserted[0] : null;
+	const q = single ? (single.stale || single.error || single.signal?.rsrp == null ? 0 : Math.max(0, Math.min(100, (single.signal.rsrp + 120) * 2.5))) : (m.quality ?? 0);
+	const n = q >= 75 ? 4 : q >= 50 ? 3 : q >= 25 ? 2 : q > 0 ? 1 : 0;
 	$('bar-bars').querySelectorAll('i').forEach((el, i) => el.classList.toggle('on', i < n));
 
 	const b = st.battery, bat = $('bar-bat');
@@ -263,8 +777,8 @@ function batteryText(b) {
 }
 
 function renderOverview(st) {
-	const [rx, rxu] = fmtRate(st.traffic.rx_rate);
-	const [tx, txu] = fmtRate(st.traffic.tx_rate);
+	const [rx, rxu] = T551M.speed(st.traffic.rx_rate);
+	const [tx, txu] = T551M.speed(st.traffic.tx_rate);
 	setText('ov-rx', rx); setText('ov-rx-u', rxu);
 	setText('ov-tx', tx); setText('ov-tx-u', txu);
 	const [rt, rtu] = fmtBytes(st.traffic.rx_total), [tt, ttu] = fmtBytes(st.traffic.tx_total);
@@ -321,11 +835,11 @@ function usage(id, used, total) {
 
 function renderSignal(st) {
 	const m = st.modem, c = m.cell;
-	setText('sg-tech', m.tech ? techName(m.tech) : '--');
+	setText('sg-tech', m.radio_label || (m.tech ? techName(m.tech) : '--'));
 	setText('sg-band', c?.band ?? '');
-	setText('sg-op', [m.operator, m.registration == 'roaming' ? t('roaming') : null].filter(Boolean).join(' · ') || '--');
+	setText('sg-op', [T551M.operator(m.operator), m.registration == 'roaming' ? t('roaming') : null].filter(Boolean).join(' · ') || '--');
 	const sig = m.signal ?? {};
-	for (const [kind, v, unit] of [['rsrp', sig.rsrp, ' dBm'], ['rsrq', sig.rsrq, ' dB'], ['sinr', sig.snr, ' dB']]) {
+	for (const [kind, v, unit] of [['rsrp', sig.rsrp, ' dBm'], ['sinr', sig.snr, ' dB'], ['rsrq', sig.rsrq, ' dB']]) {
 		const g = grade(kind, v);
 		setText('sg-' + kind, v == null ? '--' : `${v.toFixed(1)}${unit} · ${t(g.word)}`);
 		const bar = $('sg-' + kind + '-bar');
@@ -363,9 +877,7 @@ async function renderHotspot(st) {
 	if (w.ssid && qrFor !== qrKey) {
 		qrFor = qrKey;
 		try {
-			const r = await fetch('/api/qr', { cache: 'no-store' });
-			setHTML('hs-qr', r.ok ? await r.text() : '');
-			if (!r.ok) qrFor = null;
+			setHTML('hs-qr', await pageRead('/api/qr', P.hotspot, 'text'));
 		} catch (e) { qrFor = null; }
 	}
 
@@ -376,9 +888,18 @@ async function renderHotspot(st) {
 	).join('') : `<div class="sub">${esc(t('none'))}</div>`);
 }
 
+function usbDeviceName(d) {
+	const name = d.name || 'USB';
+	if (d.kind !== 'ethernet') return name;
+	const label = lang == 'zh' ? 'USB 网卡' : 'USB Ethernet';
+	return name === 'USB' ? label : `${label} · ${name}`;
+}
+
 // the USB row: what the link is, the host's address, its traffic while it uses the E5
 function usbText(u) {
+	if (u?.role == 'host') return (u.devices || []).map(usbDeviceName).join(' · ') || (lang == 'zh' ? 'OTG 主机，等待设备' : 'OTG host, waiting for device');
 	if (!u) return '--';
+	if (u.link == 'host') return lang == 'zh' ? 'USB 供电，未建立数据连接' : 'USB power, no data connection';
 	let s = t('usb_' + u.link);
 	if ((u.link == 'lease' || u.link == 'online') && u.ip) s += ` · ${u.ip}`;
 	// (the host's down is what the E5 sends on usb0)
@@ -403,11 +924,12 @@ function renderDevice(st) {
 
 function render(st) {
 	renderBar(st);
-	renderOverview(st);
-	renderSignal(st);
-	renderHotspot(st);
-	renderDevice(st);
 	renderUpdateNotice();
+	if (window.T551M?.isLocked() || appOpen) return;
+	if (page == P.overview) renderOverview(st);
+	else if (page == P.signal) renderSignal(st);
+	else if (page == P.hotspot) renderHotspot(st);
+	else if (page == P.device) renderDevice(st);
 }
 
 /* ---------- clock ---------- */
@@ -430,21 +952,104 @@ setInterval(() => { if (!blank) tickClock(); }, 1000);
 
 /* ---------- data ---------- */
 
+const pageLoads = new Map(), pageRequests = new Map();
+function loadState(index) {
+	if (!pageLoads.has(index)) pageLoads.set(index, { count: 0, pending: false, error: false, timer: null, shown: false });
+	return pageLoads.get(index);
+}
+function paintPageLoad(index) {
+	const state = loadState(index), root = pages[index];
+	if (!root) return;
+	let node = root.querySelector(':scope > .screen-load-error');
+	if (!node && state.error) {
+		node = document.createElement('div'); node.className = 'screen-load-error'; node.hidden = true;
+		node.setAttribute('role', 'status');
+		const path = root.querySelector(':scope > .stpath');
+		root.insertBefore(node, path ? path.nextSibling : root.firstChild);
+	}
+	const waiting = state.count > 0 || state.pending;
+	root.setAttribute('aria-busy', String(waiting && !state.error));
+	if (node) {
+		node.hidden = !state.error;
+		node.textContent = lang == 'zh' ? '加载失败，请重新进入页面重试' : 'Could not load. Reopen this page to retry.';
+	}
+	// A late reply from another page must not change the current title bar.
+	const indicator = $('mobile-loading');
+	if (index === page && indicator) {
+		indicator.hidden = !!appOpen || state.error || !waiting || !state.shown;
+		indicator.setAttribute('aria-label', t('loading'));
+	}
+}
+function beginPageLoad(index) {
+	const state = loadState(index);
+	state.count++; state.error = false;
+	paintPageLoad(index);
+	if (!state.timer && !state.shown) state.timer = setTimeout(() => {
+		state.timer = null; state.shown = true; paintPageLoad(index);
+	}, 150);
+	let ended = false;
+	return error => {
+		if (ended) return; ended = true;
+		state.count--; state.error ||= !!error;
+		if (!state.count && !state.pending) {
+			clearTimeout(state.timer); state.timer = null; state.shown = false;
+		}
+		paintPageLoad(index);
+	};
+}
+function pageLoadPending(index, pending) {
+	const state = loadState(index); state.pending = !!pending;
+	if (pending) state.shown = true;
+	else if (!state.count) {
+		clearTimeout(state.timer); state.timer = null; state.shown = false;
+	}
+	paintPageLoad(index);
+}
+function pageRead(path, index, type = 'json') {
+	const key = index + ':' + path;
+	if (pageRequests.has(key)) return pageRequests.get(key);
+	const done = beginPageLoad(index), controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), 25000);
+	let failed = false;
+	const request = fetch(path, { cache: 'no-store', signal: controller.signal }).then(async response => {
+		if (!response.ok) throw new Error('HTTP ' + response.status);
+		return type == 'text' ? await response.text() : await response.json();
+	}).catch(error => { failed = true; throw error; }).finally(() => {
+		clearTimeout(timer); pageRequests.delete(key); done(failed);
+	});
+	pageRequests.set(key, request);
+	return request;
+}
+
 async function poll() {
 	clearTimeout(pollTimer);
+	const done = last == null ? beginPageLoad(P.overview) : () => {};
+	const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 25000);
+	let failed = false;
 	try {
-		const r = await fetch('/api/status', { cache: 'no-store' });
+		const r = await fetch('/api/status', { cache: 'no-store', signal: controller.signal });
+		if (!r.ok) throw new Error('HTTP ' + r.status);
 		if (r.ok) {
 			const st = await r.json();
 			const first = last == null;
+
 			last = st;
+			// Reconcile changes made outside the browser, without accepting a
+			// stale status reply during a local power transition.
+			if (typeof st.screen.awake == 'boolean' && st.screen.awake === blank && performance.now() - powerChangedAt > 1000) {
+				blank = !st.screen.awake;
+				T551M.power(blank);
+				document.body.classList.toggle('blank', blank);
+				resetIdle();
+			}
+			T551M.status(st);
 			applyTouch();
 			if (first) {
 				lang = st.screen.lang in I18N ? st.screen.lang : 'zh';
 				brightness = st.screen.brightness || 120;
 				applyLang();
 				resetIdle();
-				if (!st.screen.donate_seen) donateOnce();
+				if (!st.screen.donate_seen) post('donate-seen');
 			}
 			if (!blank) render(st);
 			smsCheck(st);
@@ -452,8 +1057,11 @@ async function poll() {
 			pollUpdate();
 		}
 	} catch (e) {
+		failed = true;
 		console.log('poll: ' + e);
 	}
+	clearTimeout(timeout);
+	done(failed);
 	pollTimer = setTimeout(poll, blank ? POLL_BLANK : POLL_AWAKE);
 }
 
@@ -482,7 +1090,7 @@ function renderUpdateNotice() {
 	$('update-notes').hidden = !updateExpanded;
 	const error = u.action == 'apply' && u.result == 'failed' ? u.error : null;
 	$('update-error').hidden = !error;
-	setText('update-error', error ?? '');
+	setText('update-error', errorText(error, lang));
 	const busy = u.busy || u.checking || updateRequest;
 	setText('update-now', t(u.busy ? 'update_busy' : error ? 'update_retry' : 'update_now'));
 	$('update-now').disabled = busy;
@@ -521,7 +1129,7 @@ async function updateAction(action) {
 		updateState = result;
 		if (action == 'apply') updateState.busy = true;
 		else toast(t('update_deferred'));
-	} else toast(`${t('failed')}${result?.error ? ': ' + result.error : ''}`);
+	} else toast(`${t('failed')}${result?.error ? ': ' + errorText(result.error, lang) : ''}`);
 	renderUpdateNotice();
 	setTimeout(() => pollUpdate(true), 500);
 }
@@ -540,6 +1148,7 @@ async function volumeKey(step) {
 	if (blank) return;
 	resetIdle();
 	const osd = $('vol-osd');
+	setText('vol-label', r.kind === 'call' ? t('call_volume') : t('volume'));
 	setText('vol-n', r.level > 0 ? String(r.level) : t('muted'));
 	$('vol-bar').style.width = Math.round(r.level / (r.max || 15) * 100) + '%';
 	osd.classList.add('show');
@@ -557,12 +1166,20 @@ function toast(msg) {
 
 /* ---------- screen power ---------- */
 
+let powerQueue = Promise.resolve(), powerChangedAt = -Infinity;
 function setBlank(on) {
 	if (on == blank) return;
 	if (!on && locked) return;          // locked: nothing lights the screen
+
 	blank = on;
+	powerChangedAt = performance.now();
+	T551M.power(on);
+	applyTouch();
 	document.body.classList.toggle('blank', on);
-	post('backlight', { level: on ? 0 : brightness });
+	const level = on ? 0 : brightness;
+	powerQueue = powerQueue.catch(() => {}).then(() => post('backlight', { level })).then(r => {
+		if (!r?.ok) throw new Error('screen power transition failed');
+	}).catch(e => { console.log(e); toast(lang == 'zh' ? '屏幕状态同步失败，请按电源键重试' : 'Press power to retry'); });
 	if (!on) {
 		if (last) render(last);
 		poll();
@@ -573,7 +1190,7 @@ function setBlank(on) {
 function resetIdle() {
 	clearTimeout(idleTimer);
 	const idle = last?.screen?.idle ?? 60;
-	if (!blank && idle > 0 && !(appOpen && appKeepAwake))
+	if (!blank && idle > 0 && !T551MPower.isOpen() && !T551MCalls.active() && !(appOpen && appKeepAwake))
 		idleTimer = setTimeout(() => setBlank(true), idle * 1000);
 }
 
@@ -652,11 +1269,14 @@ function keyLock(power, star) {
 
 function showPage(n) {
 	page = (n + pages.length) % pages.length;
+	T551M.page(page);
+	pages.forEach((node, index) => node.classList.toggle('is-current', index == page));
 	$('pages').style.transform = `translateX(${-100 * page}%)`;
 	$('dots').innerHTML = pages.map((_, i) => `<i class="${i == page ? 'on' : ''}"></i>`).join('');
 	$('foot-title').textContent = t(pages[page].dataset.title);
 	if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 	pages[page].scrollTop = 0;
+	if (last) render(last);
 	if (page == P.hotspot) {
 		qrFor = null;
 		if (last) renderHotspot(last);
@@ -810,7 +1430,7 @@ document.addEventListener('keydown', (e) => {
 // tap with a click it synthesises itself -- isTrusted false -- and its touch
 // hit-testing ignores pointer-events: so every click is dropped, except the
 // ones the keypad's confirm key makes (keyClick).
-function touchOff() { return locked || last?.screen?.touch === false; }
+function touchOff() { return blank || (locked && !T551MCalls.active()) || last?.screen?.touch === false; }
 let keyClick = false;
 for (const ev of ['touchstart', 'touchmove', 'touchend', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click'])
 	window.addEventListener(ev, (e) => {
@@ -872,18 +1492,18 @@ function fmtSmsTime(ts) {
 
 async function loadSms() {
 	try {
-		const r = await fetch('/api/sms', { cache: 'no-store' });
-		if (r.ok) smsList = (await r.json()).messages ?? [];
+		const data = await pageRead('/api/sms', P.sms);
+		smsList = data.messages ?? [];
+		renderSmsList();
 	} catch (e) {
 		console.log('sms: ' + e);
 	}
-	renderSmsList();
 	if (smsOpen != null) {
 		const current = smsList.find(m => m.id == smsOpen);
 		if (current) {
 			setText('sv-time', [current.sim, fmtSmsTime(current.time)].filter(Boolean).join(' · '));
 			setText('sv-text', current.text ?? '');
-		}
+		} else closeSms();
 	}
 	return smsList;
 }
@@ -945,7 +1565,11 @@ function markSmsRead() {
 
 // a message in the unread list that was not there at the last poll: light
 // the screen (if e5-notify.sms.screen) and show it
+let smsHiddenRevision;
 async function smsCheck(st) {
+	const hiddenChanged=smsHiddenRevision!=null && smsHiddenRevision!==st.sms?.hidden_revision;
+	smsHiddenRevision=st.sms?.hidden_revision;
+	if (hiddenChanged && page==P.sms && !blank) await loadSms();
 	const now = st.sms?.unread ?? [];
 	const before = smsUnread;
 	smsUnread = now;
@@ -958,7 +1582,7 @@ async function smsCheck(st) {
 	}
 	if (!st.sms.screen || locked) return;
 	if (blank) setBlank(false);
-	if (page != P.sms) showPage(P.sms);
+	if (!T551M.isLocked() && page != P.sms) showPage(P.sms);
 	await loadSms();
 	const newest = smsList.find(m => fresh.includes(m.id));
 	toast(t('new_sms') + (newest?.sim ? ' · ' + newest.sim : ''));
@@ -985,6 +1609,7 @@ on('sv-delete', 'click', async () => {
 	disarmDelete();
 	const r = await post('sms-delete', { id });
 	toast(r?.ok ? t('deleted') : '✗');
+	if (!r?.ok) return;
 	smsList = smsList.filter((m) => m.id != id);
 	closeSms();
 	loadSms();
@@ -992,20 +1617,28 @@ on('sv-delete', 'click', async () => {
 
 /* ---------- traffic ---------- */
 
+let trafficRequest = 0;
+function clearTrafficDisplay() {
+	for (const id of ['tf-day-used','tf-mon-used','tf-day-rx','tf-day-tx','tf-mon-rx','tf-mon-tx','tf-boot-rx','tf-boot-tx']) setText(id,'—');
+	for (const id of ['tf-days','tf-day-since','tf-mon-since']) setText(id,'');
+}
+on('tf-slot','change',()=>{clearTrafficDisplay();loadTraffic();});
 async function loadTraffic() {
+	const request = ++trafficRequest, slot = $('tf-slot')?.value || '';
 	let u = null;
 	try {
-		const r = await fetch('/api/traffic', { cache: 'no-store' });
-		if (r.ok) u = await r.json();
+		u = await pageRead('/api/traffic' + (slot ? '?slot='+slot : ''), P.traffic);
 	} catch (e) {
 		console.log('traffic: ' + e);
 	}
-	const b = (n) => { const [v, unit] = fmtBytes(n); return `${v} ${unit}`; };
-	if (last) {
-		setText('tf-boot-rx', b(last.traffic.rx_total));
-		setText('tf-boot-tx', b(last.traffic.tx_total));
-	}
-	if (!u || !u.available) return;
+	if (request !== trafficRequest) return;
+	const b = T551M.amount;
+	clearTrafficDisplay();
+	const warning = !u || u.error ? t('traffic_unavailable') : !u.available ? t('traffic_clock') : u.storage_error ? t('traffic_storage') : u.interface_available === false ? t('traffic_history') : '';
+	setText('tf-state', (u?.slot == null ? '' : 'SIM '+(+u.slot+1)+(warning ? ' · ' : ''))+warning);
+	setText('tf-boot-rx',b(u?.session?.rx));setText('tf-boot-tx',b(u?.session?.tx));
+	if (!u?.available) return;
+	setText('tf-day-used',b(u.today_used));setText('tf-mon-used',b(u.month_used));
 	setText('tf-day-rx', b(u.today.rx)); setText('tf-day-tx', b(u.today.tx));
 	setText('tf-mon-rx', b(u.month.rx)); setText('tf-mon-tx', b(u.month.tx));
 	const l = u.lan?.available ? u.lan : null;
@@ -1032,18 +1665,30 @@ async function loadTraffic() {
 
 const REG_WORD = { home: 'home', roaming: 'roaming_reg', idle: 'idle_reg', denied: 'denied', searching: 'searching' };
 
+let advancedBusy = false, advancedRetry = null;
 async function loadAdvanced() {
+	if (adv) renderAdvanced(adv);
+	if (advancedBusy) return;
+	advancedBusy = true;
+	clearTimeout(advancedRetry);
 	try {
-		const r = await fetch('/api/advanced', { cache: 'no-store' });
-		if (r.ok) adv = await r.json();
+		adv = await pageRead('/api/advanced', P.adv_info);
+		pageLoadPending(P.adv_info, adv?.radio_pending);
 	} catch (e) {
+		pageLoadPending(P.adv_info, false);
 		console.log('advanced: ' + e);
 	}
+	finally { advancedBusy = false; }
 	if (adv) renderAdvanced(adv);
+	if (adv?.radio_pending && page === P.adv_info && !blank)
+		advancedRetry = setTimeout(() => { if (page === P.adv_info && !blank) loadAdvanced(); }, 800);
 }
 
 function renderAdvanced(a) {
+
 	const d = a.device ?? {}, b = a.baseband, s = a.sim;
+	setText('ad-freshness', a.radio_error ? (lang == 'zh' ? '部分无线信息暂不可用' : 'Some radio details unavailable') : '');
+	$('ad-freshness').hidden = !a.radio_error;
 	setText('ad-model', d.model ?? '--');
 	setText('ad-os', d.os ?? '--');
 	setText('ad-image', d.image ?? '--');
@@ -1071,12 +1716,12 @@ function renderAdvanced(a) {
 	setText('ad-modes', b?.modes?.replace(/^allowed: /, '').replace(/; preferred: none$/, '') ?? '--');
 	setHTML('ad-fw', (b?.firmware ?? []).map((f) => `${esc(f.name)}: ${esc(f.value)}`).join('<br>'));
 
-	const bands = (list, pre) => list?.length ? list.map((x) => pre + x).join(' ') : t('not_locked');
+	const bands = (list, pre) => list == null ? '--' : list.length ? list.map((x) => pre + x).join(' ') : t('not_locked');
 	setText('ad-lte', b ? bands(b.lte_lock, 'B') : '--');
 	setText('ad-nr', b ? bands(b.nr_lock, 'n') : '--');
 	const cells = [...(b?.lte_cell_lock ?? []).map((c) => `LTE ${c.arfcn}/${c.pci}`),
 		...(b?.nr_cell_lock ?? []).map((c) => `NR ${c.arfcn}/${c.pci}`)];
-	setText('ad-cell', b ? (cells.length ? cells.join(', ') : t('not_locked')) : '--');
+	setText('ad-cell', b && b.lte_cell_lock != null && b.nr_cell_lock != null ? (cells.length ? cells.join(', ') : t('not_locked')) : '--');
 
 	setText('ad-slot', s?.active_slot ? t('card') + s.active_slot : '--');
 	setText('ad-op', s ? [s.operator, s.operator_code].filter(Boolean).join(' · ') || '--' : '--');
@@ -1098,7 +1743,7 @@ on('ad-moretemps', 'click', () => {
 
 on('ad-showids', 'click', async () => {
 	if (showIds) return hideIds();
-	const r = await fetch('/api/identity', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+	const r = await pageRead('/api/identity', P.adv_info).catch(() => null);
 	if (!r) return;
 	showIds = true;
 	setText('id-imei', r.imei ?? '--');
@@ -1116,7 +1761,7 @@ on('ad-showids', 'click', async () => {
 let st = [];
 let stCats = null;
 let stArmed = null;               // { key, timer }: the row waiting for its second press
-const lbl = (l) => (l && typeof l == 'object') ? (l[lang] ?? l.zh ?? '') : (l ?? '');
+const lbl = (l) => errorText((l && typeof l == 'object') ? (l[lang] ?? l.zh ?? '') : (l ?? ''), lang);
 
 function stTop() { return st[st.length - 1]; }
 
@@ -1124,20 +1769,24 @@ async function stOpen() {
 	if (!st.length) st = [{ view: 'menu' }];
 	stRender();
 	if (!stCats) {
-		const r = await fetch('/api/settings', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
-		stCats = r?.categories ?? [];
+		const r = await pageRead('/api/settings', P.settings).catch(() => null);
+		if (r) stCats = r.categories ?? [];
 		stRender();
 	}
 }
 
 async function stLoadCat(v) {
-	const r = await fetch('/api/settings/' + v.cat.id, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
-	v.items = r?.items ?? [];
+	const r = await pageRead('/api/settings/' + v.cat.id, P.settings).catch(() => null);
+	if (r) v.items = r.items ?? [];
 	if (stTop() === v) stRender();
 }
 
 function stDisarm() {
-	if (stArmed) clearTimeout(stArmed.timer);
+	if (stArmed) {
+		clearTimeout(stArmed.timer);
+		stArmed.el?.classList.remove('armed');
+		stArmed.el?.querySelector('.st-confirm-hint')?.remove();
+	}
 	stArmed = null;
 }
 
@@ -1148,11 +1797,15 @@ function stConfirm(key, el) {
 		return true;
 	}
 	stDisarm();
-	stArmed = { key, timer: setTimeout(() => { stDisarm(); stRender(); }, 3000) };
+	stArmed = { key, el, timer: setTimeout(() => { stDisarm(); stRender(); }, 3000) };
 	if (el) {
 		el.classList.add('armed');
-		const sv = el.querySelector('.sv');
-		if (sv) sv.textContent = t('press_again');
+
+		const hint = document.createElement('span');
+		hint.className = 'st-confirm-hint';
+		hint.setAttribute('aria-live', 'polite');
+		hint.textContent = t('press_again');
+		el.appendChild(hint);
 	}
 	return false;
 }
@@ -1168,7 +1821,7 @@ function stValue(it) {
 		if (!it.value?.length) return lbl(it.none_label) || t('not_locked');
 		return it.value.map((v) => lbl((it.options ?? []).find((o) => o.value == v)?.label) || v).join(' ');
 	}
-	if (it.type == 'info') return (it.value && typeof it.value == 'object') ? lbl(it.value) : String(it.value ?? '--');
+	if (it.type == 'info') return lbl(it.value ?? '--');
 	return '';
 }
 
@@ -1182,27 +1835,27 @@ function stRow(key, label, value, opts = {}) {
 function stRender() {
 	const v = stTop();
 	if (!v) return;
-	const path = st.map((x) => x.view == 'menu' ? t('settings') : x.view == 'store' ? t('app_store') : x.view == 'atres' ? x.cmd : x.view == 'app' ? (lbl(x.app.name) || x.app.id) : x.cat ? lbl(x.cat.label) : x.item ? lbl(x.item.label) : x.dev ? (x.dev.name ?? x.dev.ip ?? x.dev.mac) : x.view == 'btdev' ? (x.name ?? x.mac) : '').join(' › ');
+	const path = st.map((x) => x.view == 'menu' ? t('settings') : x.view == 'store' ? t('app_store') : x.view == 'atres' ? (lang == 'zh' ? '执行结果' : 'Result') : x.view == 'app' ? (lbl(x.app.name) || x.app.id) : x.item ? lbl(x.item.label) : x.cat ? lbl(x.cat.label) : x.dev ? (x.dev.name ?? x.dev.ip ?? x.dev.mac) : x.view == 'btdev' ? (x.name ?? x.mac) : '').join(' › ');
 	setText('st-path', path);
 	let html = '';
 	if (v.view == 'menu') {
 		// Apps and their settings share the app manager; plugin categories stay
 		// in the API so an app's detail view can open its own settings.
-		html = stCats == null ? `<div class="sub">${esc(t('loading'))}</div>` :
-			stCats.map((c, i) => c.plugin ? '' : stRow('cat:' + i, lbl(c.label), '', { chev: true })).join('');
+		html = stCats == null ? '' :
+			stCats.map((c, i) => c.plugin || c.parent ? '' : stRow('cat:' + i, lbl(c.label), '', { chev: true })).join('');
 	} else if (v.view == 'cat') {
-		html = v.items == null ? `<div class="sub">${esc(t('loading'))}</div>` :
+		html = v.items == null ? '' :
 			v.items.map((it) => stRow('item:' + it.id, lbl(it.label), stValue(it),
 				{ info: it.type == 'info', on: it.type == 'toggle' && it.value, note: lbl(it.note),
-				  chev: ['choice', 'number', 'multi', 'image'].includes(it.type) })).join('');
+				  chev: ['choice', 'number', 'multi', 'image', 'category'].includes(it.type) })).join('');
 	} else if (v.view == 'edit') {
 		const it = v.item;
 		if (it.type == 'choice') {
 			html = it.options.map((o, i) => `<button class="strow opt${String(o.value) == String(it.value) ? ' on' : ''}" data-st="opt:${i}"><span>${esc(lbl(o.label))}</span><span class="sv"></span></button>`).join('');
 		} else if (it.type == 'number') {
-			html = `<div class="card stnum">${esc(String(v.draft))}${esc(it.unit ?? '')}</div>` +
+			html = `<div class="stnumber-editor"><div class="card stnum">${esc(String(v.draft))}${esc(it.unit ?? '')}</div>` +
 				`<div class="stbtns"><button class="btn" data-st="num:-">−</button><button class="btn" data-st="num:+">+</button></div>` +
-				`<div style="height:8px"></div><button class="strow" data-st="num:save"><span>${esc(t('save'))}</span><span class="sv"></span></button>`;
+				`<button class="strow" data-st="num:save"><span>${esc(t('save'))}</span><span class="sv"></span></button></div>`;
 		} else if (it.type == 'multi') {
 			html = it.options.map((o, i) => `<button class="strow opt check${v.draft.includes(o.value) ? ' on' : ''}" data-st="chk:${i}"><span>${esc(lbl(o.label))}</span><span class="sv"></span></button>`).join('') +
 				`<button class="strow" data-st="multi:clear"><span>${esc(t('clear'))}</span><span class="sv"></span></button>` +
@@ -1210,29 +1863,30 @@ function stRender() {
 		}
 		if (it.note) html += `<div class="stnote">${esc(lbl(it.note))}</div>`;
 	} else if (v.view == 'at') {
-		html = v.presets == null ? `<div class="sub">${esc(t('loading'))}</div>` :
+		html = v.presets == null ? '' :
+			stRow('atslot:',lang=='zh'?'AT 卡槽':'AT SIM','SIM '+(+(v.slot ?? last?.modem?.sim_card ?? 0)+1),{chev:true})+
 			v.presets.map((p, i) => stRow('atp:' + i, lbl(p.label), p.cmd)).join('') +
 			`<div class="stnote">${esc(t('at_note'))}</div>`;
 	} else if (v.view == 'atres') {
-		html = `<div class="card"><div class="sub">${esc(v.cmd)}</div>` +
-			`<div class="smstext" style="margin-top:6px;font-size:13px">${esc(v.reply ?? t('at_running'))}</div></div>` +
+		html = `<div class="card st-at-result"><div class="st-at-command">${esc(v.cmd)}</div>` +
+			`${v.reply == null ? '' : `<pre class="st-at-output">${esc(v.reply)}</pre>`}</div>` +
 			(v.warn ? `<div class="stnote">${esc(v.warn)}</div>` : '') +
 			stRow('atagain:', t('at_again'), '');
 	} else if (v.view == 'devices') {
-		html = v.list == null ? `<div class="sub">${esc(t('loading'))}</div>` : v.list.length ?
+		html = v.list == null ? '' : v.list.length ?
 			v.list.map((d, i) => stRow('dev:' + i, d.name ?? d.ip ?? d.mac,
 				d.blocked ? t('blocked') : d.online ? `${t('online')} · ${t(d.via ?? 'wifi')}` : t('offline'),
 				{ on: d.online && !d.blocked, chev: true })).join('') : `<div class="sub">${esc(t('no_devices'))}</div>`;
 	} else if (v.view == 'apps') {
-		html = stRow('store:', t('app_store'), '', { chev: true }) + (v.list == null ? `<div class="sub">${esc(t('loading'))}</div>` :
+		html = stRow('store:', t('app_store'), '', { chev: true }) + (v.list == null ? '' :
 			(v.list.length ? v.list.map((m) => stRow('apm:' + m.id, lbl(m.name) || m.id,
 				(m.version ? 'v' + m.version + ' · ' : '') + (m.builtin ? t('app_builtin') : t('app_user')), { chev: true })).join('')
 				: `<div class="sub">${esc(t('no_apps'))}</div>`) +
 			`<div class="stnote">${esc(t('app_install_note'))}</div>`);
 	} else if (v.view == 'store') {
 		const s = v.store;
-		if (!s) html = `<div class="sub">${esc(t('loading'))}</div>`;
-		else if (!s.available) html = `<div class="sub">${esc(t('store_fail'))}${s.error ? ': ' + esc(s.error) : ''}</div>`;
+		if (!s) html = '';
+		else if (!s.available) html = `<div class="sub">${esc(t('store_fail'))}${s.error ? ': ' + esc(errorText(s.error, lang)) : ''}</div>`;
 		else html = s.plugins.length ? s.plugins.map((p) => {
 			const have = p.installed != null, same = have && p.installed == p.version;
 			const what = same ? `${t('store_have')} v${p.version}` : have ? `${t('store_update')} v${p.version}` : `${t('store_install')} v${p.version}`;
@@ -1252,7 +1906,7 @@ function stRender() {
 			(m.builtin ? `<div class="stnote">${esc(t('app_builtin_note'))}</div>` : '');
 	} else if (v.view == 'bluetooth') {
 		const b = v.bt;
-		if (!b) html = `<div class="sub">${esc(t('loading'))}</div>`;
+		if (!b) html = '';
 		else if (!b.adapter) html = `<div class="sub">${esc(t('bt_none'))}</div>`;
 		else {
 			html = stRow('bt:power', t('bluetooth'), b.powered ? t('on') : t('off'), { on: b.powered }) +
@@ -1283,6 +1937,7 @@ function stRender() {
 	}
 	const focused = document.activeElement?.dataset?.st;
 	setHTML('st-view', html);
+	T551M.settings($('st-view'), v, stCats);
 	if (focused) {
 		const el = document.querySelector(`[data-st="${CSS.escape(focused)}"]`);
 		if (el) el.focus();
@@ -1290,22 +1945,49 @@ function stRender() {
 }
 
 async function stPost(v, body) {
-	const r = await fetch('/api/settings/' + v.cat.id, {
+	const item = v.items?.find(i=>i.id===body.id);
+	if (item?.slot != null) body.slot = item.slot;
+	const done = beginPageLoad(P.settings);
+	v.saving = true;
+	let r = await fetch('/api/settings/' + v.cat.id, {
 		method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 	}).then((r) => r.json()).catch(() => null);
-	toast(r?.ok ? (v.cat.id == 'usb' && body.id == 'reset' ? t('usb_resetting') : t('saved')) : `${t('failed')}${r?.error ? ': ' + r.error : ''}`);
+	if (r?.pending && r.job) {
+		const job=r.job, slot=r.slot, until=Date.now()+245000;
+		try {
+			while (Date.now()<until) {
+				await new Promise(resolve=>setTimeout(resolve,800));
+				r=await fetch('/api/network-job?id='+encodeURIComponent(job)+'&slot='+encodeURIComponent(slot),{cache:'no-store'}).then(r=>r.json());
+				if (!['queued','running'].includes(r.state)) break;
+			}
+			if (r.state!=='done') r={ok:false,error:r.error || (lang=='zh'?'操作尚未完成，请刷新实际状态':'Operation incomplete; refresh actual state')};
+		} catch(e) {r={ok:false,error:String(e)};}
+		await stLoadCat(v);
+	}
+	v.saving = false;done(!r?.ok);
+	toast(r?.ok ? (v.cat.id == 'usb' && body.id == 'reset' ? t('usb_resetting') : t('saved')) : `${t('failed')}${r?.error ? ': ' + errorText(r.error, lang) : ''}`);
+	if (r?.ok && v.cat.id == 'traffic_clear') {
+		++trafficRequest;
+		clearTrafficDisplay();
+		T551M.refreshUsage();
+		toast(t('traffic_cleared'));
+	}
 	if (r?.item) {
 		const i = v.items.findIndex((x) => x.id == r.item.id);
 		if (i >= 0) v.items[i] = r.item;
 	}
 	if (r?.ok && r.item?.reload) stLoadCat(v);
-	if (r?.ok && v.cat.id == 'usb' && body.id == 'reset') {
+	if (r?.ok && v.cat.id == 'usb' && ['reset','usb_role','usb_host_boot'].includes(body.id)) {
 		const refresh = async () => {
 			if (!st.includes(v)) return;
 			await stLoadCat(v);
-			if (v.items?.find(i => i.id == 'reset_status')?.busy) setTimeout(refresh, 2000);
+			if (v.items?.some(i => ['reset_status','usb_role_state'].includes(i.id) && i.busy)) setTimeout(refresh, 2000);
 		};
 		setTimeout(refresh, 2000);
+	}
+	if (r?.ok && ['ui', 'navigation'].includes(v.cat.id)) {
+		last.screen[body.id] = r.item?.value ?? body.value;
+		T551M.status(last);
 	}
 	if (r?.ok && v.cat.id == 'screen') stScreenApplied(body.id, r.item?.value ?? body.value);
 	if (r?.ok && v.cat.id == 'system' && body.id == 'clock_seconds' && last) {
@@ -1338,17 +2020,20 @@ function stScreenApplied(id, value) {
 
 async function stClick(key, el) {
 	const v = stTop();
+	if (v?.saving || v?.parent?.saving) return;
 	const [k, arg] = [key.slice(0, key.indexOf(':')), key.slice(key.indexOf(':') + 1)];
+	if (k == 'atslot') {v.slot=String(1-+(v.slot ?? last?.modem?.sim_card ?? 0));stRender();return;}
 	if (k == 'atp' || k == 'atagain') {
 		const cmd = k == 'atp' ? v.presets[+arg].cmd : v.cmd;
-		const nv = k == 'atp' ? { view: 'atres', cmd, reply: null } : v;
+		const nv = k == 'atp' ? { view: 'atres', cmd, reply: null, slot: v.slot ?? String(last?.modem?.sim_card ?? 0) } : v;
 		if (k == 'atp') st.push(nv);
 		nv.reply = null;
 		stRender();
+		const done = beginPageLoad(P.settings);
 		const r = await fetch('/api/at', {
-			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd })
-		}).then((r) => r.json()).catch(() => null);
-		nv.reply = r?.ok ? (r.reply || 'OK') : `${t('failed')}: ${r?.error ?? ''}`;
+			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd, slot:nv.slot })
+		}).then((r) => r.json()).catch(() => null).finally(() => done());
+		nv.reply = r?.ok ? (r.reply || 'OK') : `${t('failed')}: ${errorText(r?.error, lang)}`;
 		nv.warn = r?.warning ? t('at_risky') : null;
 		if (stTop() === nv) stRender();
 		return;
@@ -1358,7 +2043,7 @@ async function stClick(key, el) {
 		if (c.view == 'at') {
 			const nv = { view: 'at', cat: c, presets: null };
 			st.push(nv); stRender();
-			const r = await fetch('/api/at/presets', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+			const r = await pageRead('/api/at/presets', P.settings).catch(() => null);
 			nv.presets = r?.presets ?? [];
 			if (stTop() === nv) stRender();
 			return;
@@ -1366,7 +2051,7 @@ async function stClick(key, el) {
 		if (c.view == 'apps') {
 			const nv = { view: 'apps', cat: c, list: null };
 			st.push(nv); stRender();
-			const r = await fetch('/api/plugins', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+			const r = await pageRead('/api/plugins', P.settings).catch(() => null);
 			nv.list = r?.plugins ?? [];
 			if (stTop() === nv) stRender();
 			return;
@@ -1380,7 +2065,7 @@ async function stClick(key, el) {
 		if (c.view == 'devices') {
 			const nv = { view: 'devices', cat: c, list: null };
 			st.push(nv); stRender();
-			const r = await fetch('/api/devices', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+			const r = await pageRead('/api/devices', P.settings).catch(() => null);
 			nv.list = r?.devices ?? [];
 			if (stTop() === nv) stRender();
 		} else {
@@ -1393,6 +2078,14 @@ async function stClick(key, el) {
 	if (k == 'item') {
 		const it = v.items.find((x) => x.id == arg);
 		if (!it) return;
+		if (it.type == 'category') {
+			const c = stCats.find(x => x.id == it.category);
+			if (!c) return;
+			const nv = {view:'cat',cat:c,items:null};
+			st.push(nv); stRender();
+			await stLoadCat(nv);
+			return;
+		}
 		if (it.type == 'toggle') {
 			if (it.confirm && !stConfirm(key, el)) return;
 			await stPost(v, { id: it.id, value: !it.value });
@@ -1417,13 +2110,13 @@ async function stClick(key, el) {
 		if (k == 'opt') {
 			const o = it.options[+arg];
 			if (it.confirm && String(o.value) != String(it.value) && !stConfirm(key, el)) return;
-			if (String(o.value) != String(it.value)) await stPost(v.parent, { id: it.id, value: o.value });
-			st.pop(); stRender();
+			if (String(o.value) != String(it.value) && !(await stPost(v.parent, { id: it.id, value: o.value }))?.ok) return;
+			if (stTop()===v) st.pop(); stRender();
 		} else if (k == 'num') {
 			if (arg == 'save') {
 				if (it.confirm && !stConfirm(key, el)) return;
-				await stPost(v.parent, { id: it.id, value: v.draft });
-				st.pop(); stRender();
+				if (!(await stPost(v.parent, { id: it.id, value: v.draft }))?.ok) return;
+				if (stTop()===v) st.pop(); stRender();
 			} else {
 				v.draft = Math.min(it.max, Math.max(it.min, +v.draft + (arg == '+' ? 1 : -1) * (it.step ?? 1)));
 				stRender();
@@ -1435,8 +2128,8 @@ async function stClick(key, el) {
 		} else if (k == 'multi') {
 			if (arg == 'clear') { v.draft = []; stRender(); return; }
 			if (it.confirm && !stConfirm(key, el)) return;
-			await stPost(v.parent, { id: it.id, value: v.draft });
-			st.pop(); stRender();
+			if (!(await stPost(v.parent, { id: it.id, value: v.draft }))?.ok) return;
+			if (stTop()===v) st.pop(); stRender();
 		}
 		return;
 	}
@@ -1444,8 +2137,7 @@ async function stClick(key, el) {
 		const nv = k == 'store' ? { view: 'store', store: null, parent: v } : v;
 		if (k == 'store') st.push(nv);
 		nv.store = null; stRender();
-		nv.store = await fetch('/api/store' + (k == 'storerf' ? '?refresh=1' : ''), { cache: 'no-store' })
-			.then((r) => r.json()).catch(() => ({ available: false }));
+		nv.store = await pageRead('/api/store' + (k == 'storerf' ? '?refresh=1' : ''), P.settings).catch(() => ({ available: false }));
 		if (stTop() === nv) stRender();
 		return;
 	}
@@ -1456,10 +2148,10 @@ async function stClick(key, el) {
 		v.busy = p.id; stRender();
 		const r = await post('store-install', { id: p.id });
 		v.busy = null;
-		toast(r?.ok ? t('saved') : `${t('failed')}${r?.error ? ': ' + r.error : ''}`);
-		v.store = await fetch('/api/store', { cache: 'no-store' }).then((r) => r.json()).catch(() => v.store);
+		toast(r?.ok ? t('saved') : `${t('failed')}${r?.error ? ': ' + errorText(r.error, lang) : ''}`);
+		v.store = await pageRead('/api/store', P.settings).catch(() => v.store);
 		// (the apps list below it, and the Apps page, see the new one)
-		if (v.parent?.view == 'apps') v.parent.list = (await fetch('/api/plugins', { cache: 'no-store' }).then((r) => r.json()).catch(() => null))?.plugins ?? v.parent.list;
+		if (v.parent?.view == 'apps') v.parent.list = (await pageRead('/api/plugins', P.settings).catch(() => null))?.plugins ?? v.parent.list;
 		loadApps();
 		if (stTop() === v) stRender();
 		return;
@@ -1486,7 +2178,7 @@ async function stClick(key, el) {
 		}
 		if (!stConfirm(key, el)) return;
 		const r = await post('plugins-remove', { id: v.app.id });
-		toast(r?.ok ? t('app_removed') : `${t('failed')}${r?.error ? ': ' + r.error : ''}`);
+		toast(r?.ok ? t('app_removed') : `${t('failed')}${r?.error ? ': ' + errorText(r.error, lang) : ''}`);
 		if (r?.ok) {
 			st.pop();
 			v.parent.list = v.parent.list.filter((x) => x.id != v.app.id);
@@ -1513,7 +2205,7 @@ async function stClick(key, el) {
 		if ((arg == 'remove' || arg == 'disconnect') && !stConfirm(key, el)) return;
 		const r = await btPost(v.parent, { action: arg, mac: v.mac });
 		if (r?.ok && arg == 'remove') { st.pop(); }
-		toast(r?.ok ? (arg == 'connect' ? t('bt_connecting') : t('saved')) : `${t('failed')}${r?.error ? ': ' + r.error : ''}`);
+		toast(r?.ok ? (arg == 'connect' ? t('bt_connecting') : t('saved')) : `${t('failed')}${r?.error ? ': ' + errorText(r.error, lang) : ''}`);
 		stRender();
 		return;
 	}
@@ -1528,7 +2220,7 @@ async function stClick(key, el) {
 			method: 'POST', headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ mac: v.dev.mac, action: arg })
 		}).then((r) => r.json()).catch(() => null);
-		toast(r?.ok ? (arg == 'kick' ? t('kicked') : t('saved')) : `${t('failed')}${r?.error ? ': ' + r.error : ''}`);
+		toast(r?.ok ? (arg == 'kick' ? t('kicked') : t('saved')) : `${t('failed')}${r?.error ? ': ' + errorText(r.error, lang) : ''}`);
 		if (r?.devices) {
 			v.parent.list = r.devices;
 			v.dev = r.devices.find((d) => d.mac == v.dev.mac) ?? v.dev;
@@ -1554,7 +2246,7 @@ function btReason(s) {
 
 async function btPoll(v) {
 	while (st.includes(v)) {
-		const r = await fetch('/api/bluetooth', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+		const r = await pageRead('/api/bluetooth', P.settings).catch(() => null);
 		if (!st.includes(v)) break;
 		if (r) v.bt = r;
 		const top = stTop();
@@ -1708,22 +2400,26 @@ document.addEventListener('focusin', (event) => {
 });
 
 async function loadApps() {
-	const r = await fetch('/api/plugins', { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+	const r = await pageRead('/api/plugins', P.apps).catch(() => null);
+	if (!r) return;
 	apps = r?.plugins ?? [];
 	setHTML('ap-list', apps.length ? apps.map((m, i) =>
 		`<button class="strow" data-app="${i}"><span>${esc(lbl(m.name) || m.id)}</span><span class="sv chev">${esc(lbl(m.description) ?? '')}</span></button>`).join('')
 		: `<div class="card sub">${esc(t('no_apps'))}</div>`);
 }
 
+let appReturnFocus = null;
 function openApp(m) {
+	if (!appOpen) appReturnFocus = document.activeElement;
 	if (imeOpen) closeInputMethod();
 	const f = $('app-frame');
 	appOpen = m;
+	T551M.page(page);
 	appKeepAwake = false;
 	appCapturePower = false;
-	f.src = `/plugins/${encodeURIComponent(m.id)}/${m.entry ?? 'index.html'}?lang=${lang}`;
+	f.src = `/plugins/${encodeURIComponent(m.id)}/${m.entry ?? 'index.html'}?lang=${lang}${m.callOverlay ? '&callonly=1' : ''}`;
 	f.hidden = false;
-	f.onload = () => { observeAppInputs(f); f.focus(); };
+	f.onload = () => { if (appOpen !== m || f.hidden) return; T551M.app(f, m); observeAppInputs(f); f.focus({preventScroll:true}); };
 	setText('foot-title', lbl(m.name) || m.id);
 	renderNotification();
 }
@@ -1731,6 +2427,7 @@ function openApp(m) {
 function closeApp() {
 	if (imeOpen) closeInputMethod();
 	const f = $('app-frame');
+	f.onload = null;
 	f.hidden = true;
 	f.src = 'about:blank';
 	appOpen = null;
@@ -1739,8 +2436,8 @@ function closeApp() {
 	resetIdle();
 	setText('foot-title', t(pages[page].dataset.title));
 	renderNotification();
-	const b = document.querySelector('[data-app]');
-	if (b) b.focus();
+	T551M.appClosed(appReturnFocus);
+	appReturnFocus = null;
 }
 
 function toApp(msg) {
@@ -1757,6 +2454,9 @@ function observeAppInputs(frame) {
 	const doc = frame.contentDocument;
 	if (!doc || doc.__e5InputObserver) return;
 	doc.__e5InputObserver = true;
+	T551MPower.attach(frame.contentWindow);
+	T551M.attachKeys(frame.contentWindow);
+	T551MCalls.attach(frame);
 	doc.addEventListener('focusin', (event) => {
 		if (!appOpen || frame !== $('app-frame') || appOpen.input_method || imeClosing || !isInputTarget(event.target)) return;
 		inputTarget = event.target;
@@ -1804,6 +2504,8 @@ window.addEventListener('message', (e) => {
 	const fromIme = imeOpen && e.source === $('ime-frame').contentWindow;
 	const fromApp = appOpen && e.source === $('app-frame').contentWindow;
 	if ((!fromIme && !fromApp) || !m || typeof m != 'object') return;
+
+	if (fromApp && T551MCalls.active() && (m.e5 === 'exit' || m.e5 === 'input' || (m.e5 === 'key' && m.kind === 'menu'))) return;
 	const send = (msg) => fromIme ? toIme(msg) : toApp(msg);
 	switch (m.e5) {
 	case 'key':                     // every key the plugin sees, for the host's own keys
@@ -1844,7 +2546,7 @@ on('hs-toggle', 'click', async () => {
 	const r = await post('wifi', { on });
 	if (!r?.ok) {
 		wifiPending = null;
-		toast(`${t('failed')}${r?.error ? ': ' + r.error : ''}`);
+		toast(`${t('failed')}${r?.error ? ': ' + errorText(r.error, lang) : ''}`);
 	}
 	setTimeout(poll, 1500);
 });
@@ -1884,6 +2586,8 @@ if ((!$('pic') || !$('update-card')) && !sessionStorage.getItem('e5-reloaded')) 
 } else {
 	sessionStorage.removeItem('e5-reloaded');
 	applyLang();
+	T551M.boot();
+	T551MCalls.boot();
 	showPage(0);
 	poll();
 }
@@ -1891,6 +2595,7 @@ if ((!$('pic') || !$('update-card')) && !sessionStorage.getItem('e5-reloaded')) 
 
 /* ---------- generic plugin notifications ---------- */
 function notificationCheck(list) {
+ list = list.filter(n => n.plugin !== 'phone' || !String(n.id).startsWith('call-'));
  notificationList = list;
  const keys = new Set(list.map(n => n.plugin + '/' + n.id));
  for (const k of notificationDismissed) if (!keys.has(k)) notificationDismissed.delete(k);

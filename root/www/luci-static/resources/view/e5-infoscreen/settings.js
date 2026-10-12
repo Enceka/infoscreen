@@ -3,6 +3,7 @@
 'require form';
 'require rpc';
 'require ui';
+'require mu300.common as M';
 
 var resetUsb = rpc.declare({ object: 'e5-infoscreen', method: 'usb_reset', expect: {} });
 var checkNetwork = rpc.declare({ object: 'e5-infoscreen', method: 'network_check', expect: {} });
@@ -24,7 +25,40 @@ return view.extend({
 		o.default = '1'; o.rmempty = false;
 		o = s.option(form.ListValue, 'lang', '语言');
 		o.value('zh', '中文'); o.value('en', 'English'); o.default = 'zh'; o.rmempty = false;
-		o = s.option(form.Value, 'update_url', '更新 JSON 地址', '留空使用 Pages 的 latest.json；旧设备也可以保留 GitHub Release 地址。');
+
+		for (var field of [
+			['status_bar', '顶部状态栏'], ['nav_bar', '底部导航栏'], ['ui_motion', '界面过渡动画'],
+			['lock_enabled', '亮屏后上滑解锁'], ['lock_daily', '锁屏显示今日流量'],
+			['lock_monthly', '锁屏显示本月流量'], ['lock_speed', '锁屏显示实时网速']
+		]) {
+			o = s.option(form.Flag, field[0], field[1]); o.default = '1'; o.rmempty = false;
+		}
+		o = s.option(form.ListValue, 'ui_accent', '界面主题色');
+		o.value('mint', '薄荷绿'); o.value('blue', '冰川蓝'); o.value('violet', '鸢尾紫'); o.default = 'mint';
+		o = s.option(form.ListValue, 'ui_theme', '外观模式', '同时调整屏幕、锁屏和电话的配色，保存并应用后自动生效。');
+		o.value('dark', '暗色'); o.value('light', '亮色'); o.default = 'dark'; o.rmempty = false;
+		o = s.option(form.ListValue, 'speed_unit', '网速单位', '锁屏和主页同步切换，随速度自动进位。比特模式按 1000 进位，字节模式按 1024 进位。');
+		o.value('bits', '比特 · bps / Kbps / Mbps / Gbps'); o.value('bytes', '字节 · B/s / KB/s / MB/s / GB/s'); o.default = 'bits'; o.rmempty = false;
+		o.cfgvalue = function(section) {
+			var value = form.ListValue.prototype.cfgvalue.call(this, section);
+			return ['bytes', 'auto', 'mbs'].indexOf(value) >= 0 ? 'bytes' : 'bits';
+		};
+		o = s.option(form.Value, 'ui_opacity', '卡片不透明度（%）', '壁纸下生效；0 为全透明，100 为实色，文字与图标不受影响。');
+		o.datatype = 'and(uinteger,range(0,100))'; o.default = '70'; o.rmempty = false;
+		o = s.option(form.ListValue, 'ui_density', '内容密度');
+		o.value('comfortable', '舒适'); o.value('compact', '紧凑'); o.default = 'comfortable';
+		o = s.option(form.ListValue, 'ui_size', '显示大小');
+		o.value('small', '小 · 85%'); o.value('standard', '标准 · 100%');
+		o.value('large', '大 · 120%'); o.value('extra', '特大 · 140%'); o.default = 'standard';
+		o = s.option(form.DummyValue, '_navigation', '底部导航');
+		o.rawhtml = true;
+		o.cfgvalue = function() { return '<a class="cbi-button" href="' + L.url('admin','services','e5-infoscreen','navigation') + '">自定义五个入口</a>'; };
+		o = s.option(form.ListValue, 'unlock_distance', '上滑解锁距离');
+		o.value('standard', '标准'); o.value('long', '更长 · 防误触'); o.default = 'standard';
+		o = s.option(form.DummyValue, '_wallpapers', '锁屏与桌面壁纸');
+		o.rawhtml = true;
+		o.cfgvalue = function() { return '<a class="cbi-button" href="' + L.url('admin','services','e5-infoscreen','wallpapers') + '">预览与更换壁纸</a>'; };
+		o = s.option(form.Value, 'update_url', M.translate('更新 JSON 地址'), M.translate('设备适配更新源需声明 adaptation=e5-device-ui-v1，更新包也须包含对应 ADAPTATION 标记；未适配的上游包不能覆盖当前界面。'));
 		o.placeholder = 'https://enceka.github.io/infoscreen/latest.json'; o.rmempty = true;
 		o = s.option(form.Value, 'store_url', '应用商店 JSON 地址', '留空使用官方应用商店。');
 		o.placeholder = 'https://enceka.github.io/infoscreen-plugins/index.json'; o.rmempty = true;

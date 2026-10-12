@@ -111,7 +111,9 @@
 			init.headers = { 'Content-Type': 'application/json' };
 			init.body = JSON.stringify(opts.body);
 		}
-		const r = await fetch(url, init);
+		let transport;
+		try { transport = window.parent !== window && window.parent.T551MTransport; } catch (_) { /* standalone/cross-origin host */ }
+		const r = await (transport ? transport.fetch(url, init) : fetch(url, init));
 		const type = r.headers.get('Content-Type') ?? '';
 		const data = type.includes('json') ? await r.json() : await r.text();
 		if (!r.ok) throw Object.assign(new Error(data?.error ?? `HTTP ${r.status}`), { status: r.status, data });

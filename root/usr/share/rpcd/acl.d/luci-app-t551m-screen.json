@@ -1,0 +1,1 @@
+{"luci-app-t551m-screen": {"description": "Screen wallpapers", "read": {"ubus": {"t551m-screen": ["wallpaper_get", "wallpaper_read"]}}, "write": {"ubus": {"t551m-screen": ["wallpaper_set", "wallpaper_upload", "wallpaper_finish", "wallpaper_reset"]}}}}

@@ -24,6 +24,8 @@ function state() {
 	let latest = null;
 	try { latest = json(ctx.read_trim(`${RUN}/latest.json`) ?? 'null'); } catch (e) {}
 	let current = ctx.read_trim('/usr/share/e5-infoscreen/VERSION') ?? '0';
+	let adaptation = ctx.read_trim('/usr/share/e5-infoscreen/ADAPTATION');
+	let compatible = !adaptation || latest?.adaptation == adaptation;
 	let pid = ctx.read_trim(`${LOCK}/pid`);
 	let cmd = pid && match(pid, /^[0-9]+$/) ? fs.readfile(`/proc/${pid}/cmdline`) : null;
 	let running = cmd != null && index(cmd, JOB) >= 0;
@@ -37,7 +39,8 @@ function state() {
 	let error = result == 'failed' ? ctx.read_trim(`${RUN}/update.log`) : null;
 	return {
 		current, latest,
-		available: latest != null && newer(latest.version, current),
+		available: compatible && latest != null && newer(latest.version, current),
+		incompatible: !!latest && !compatible,
 		busy: running && action != 'check',
 		checking: running && action == 'check',
 		checked_at: +(ctx.read_trim(`${RUN}/update-checked-at`) ?? 0),

@@ -22,7 +22,7 @@ start_service() {
 	config_load e5-infoscreen
 	local enabled
 	config_get_bool enabled main enabled 1
-	[ "$enabled" = 1 ] || return 0
+	[ "$enabled" = 1 ] || { /usr/libexec/t551m-screen-power set 0; return; }
 
 	# the installed apps (/etc/e5-infoscreen/plugins) into the web root: an
 	# image update brings a web root without their links
@@ -31,9 +31,7 @@ start_service() {
 	# the saved backlight level (the page changes it, and turns it off when idle)
 	local level bl
 	config_get level main brightness 120
-	for bl in /sys/class/backlight/*/brightness; do
-		[ -w "$bl" ] && echo "$level" > "$bl"
-	done
+	/usr/libexec/t551m-screen-power set "$level"
 
 	if [ -d "$CJK_SRC" ] && ! ls "$CJK_DST"/*.tt? >/dev/null 2>&1 &&
 	   ! grep -q " $CJK_DST " /proc/mounts; then
@@ -62,11 +60,7 @@ start_service() {
 }
 
 stop_service() {
-	# the panel lit again for whatever comes next (Debian's session, a restart)
-	local bl
-	for bl in /sys/class/backlight/*/brightness; do
-		[ -w "$bl" ] && echo 120 > "$bl"
-	done
+	/usr/libexec/t551m-screen-power set 0
 	return 0
 }
 

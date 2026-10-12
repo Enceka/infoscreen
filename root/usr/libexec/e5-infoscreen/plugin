@@ -91,6 +91,10 @@ do_install() {
 	[ -f "$src/manifest.json" ] || die "no manifest.json"
 	id=$(manifest_get "$src" '@.id')
 	valid_id "$id" || die "the manifest's id is not valid: $id"
+	required=$(manifest_get "$USER_DIR/$id" '@.device_integration')
+	[ -n "$required" ] || required=$(manifest_get "$WWW/$id" '@.device_integration')
+	[ -z "$required" ] || [ "$(manifest_get "$src" '@.device_integration')" = "$required" ] ||
+		die "This app requires its device-integrated update; the generic package would replace platform features"
 	# (from the store: the app the index said)
 	[ -z "${EXPECT_ID:-}" ] || [ "$id" = "$EXPECT_ID" ] || die "the package holds $id, not $EXPECT_ID"
 	av=$(manifest_get "$src" '@.api_version')

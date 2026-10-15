@@ -159,6 +159,10 @@ html, body {
 /* SMS */
 .smsmark { font-size: calc(12px * var(--ui-scale, 1)); font-weight: bold; color: #000; background: var(--fair); border-radius: 4px; padding: 0 4px; }
 .smsmark:empty { display: none; }
+#bar-sms { display:flex; align-items:center; justify-content:center; align-self:center; flex:none; width:18px; height:18px; line-height:0; color:var(--text); }
+#bar-sms[hidden] { display:none; }
+/* Optical alignment with the adjacent signal and battery on the physical panel. */
+#bar-sms svg { display:block; flex:none; width:18px; height:18px; transform:translateY(1px); fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .smsitem {
 	display: block; width: 100%; text-align: left;
 	font: inherit; color: var(--text);

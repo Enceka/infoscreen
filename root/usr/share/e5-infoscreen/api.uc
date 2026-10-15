@@ -1378,6 +1378,15 @@ function card_modem(m, sims) {
 	return r;
 }
 
+function boot_status() {
+    let state = read_trim('/etc/e5linux/default-boot') ?? 'android';
+    if (state != 'linux' && state != 'android') state = 'unknown';
+    let trial = match(read_trim('/proc/cmdline') ?? '', /(^| )e5\.openwrt=/) != null;
+    let control = stat('/run/e5linux/misc-bc-slot-b-trial.bin') ?? stat('/etc/e5linux/misc-bc-slot-b-trial.bin');
+    return { default: state, temporary: state == 'unknown' ? null : state != 'linux',
+             can_set_default: !trial && control != null && stat('/opt/e5/e5-next-boot') != null };
+}
+
 function status() {
 	let lt = localtime(), t = time();
 	let sims = sim_status();
@@ -1385,6 +1394,7 @@ function status() {
 	return {
 		sims,
 		time: t,
+		boot: boot_status(),
 		// the device's offset from UTC in seconds: the page formats its times
 		// with it (WebKit has no zoneinfo here and would use UTC)
 		tz_offset: timegm(lt) - t,
@@ -1596,7 +1606,7 @@ global.handle_request = function(env) {
 		if (!post && path == '/sms')
 			return reply_json(200, { messages: sms_list() });
 		if (post && path == '/sms-read')
-			return reply_json(200, { ok: system('e5-sms-notify read >/dev/null 2>&1 || : > ' + SMS_UNREAD) == 0 });
+			return reply_json(200, { ok: system('e5-sms-notify read >/dev/null 2>&1') == 0 });
 		if (post && path == '/sms-delete')
 			return reply_json(200, { ok: sms_delete(read_body(env).id ?? -1) });
 		if (post && path == '/sms-send') {

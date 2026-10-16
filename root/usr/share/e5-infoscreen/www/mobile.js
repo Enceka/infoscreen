@@ -163,7 +163,7 @@ window.T551M = (() => {
     function pageChanged(index) {
         if (!mounted) return;
         if (index !== P.traffic) closeTrafficPicker();
-        el('mobile-title').textContent = appOpen ? lbl(appOpen.name) || appOpen.id : label(index);
+        el('mobile-title').textContent = appOpen ? lbl(appOpen.short_name) || lbl(appOpen.name) || appOpen.id : label(index);
         const button = el('mobile-back'), icon = index === P.overview && !appOpen ? 'home' : 'back';
         if (button.dataset.icon !== icon) {
             button.innerHTML = svg(icon);

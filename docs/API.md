@@ -223,6 +223,7 @@ each time it is opened, the settings menu each time it is loaded.
 |---|---|
 | `id`, `api_version`, `name` | required |
 | `version`, `description` | shown in the Apps list |
+| `short_name` | optional `{zh,en}` label for the host title bar while the app is open; falls back to `name`, then `id`. The Apps list and app management continue to show `name`. Older hosts ignore this field. |
 | `entry` | the page, relative to the directory; default `index.html` |
 | `order` | position in the Apps list, low first; default 50 |
 | `input_method` | `true`: the app may send committed text and backspace actions to the host's last focused `input`, `textarea` or `contenteditable` target through the SDK. Use this only for an input method; the host ignores these messages from other apps. |

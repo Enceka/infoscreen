@@ -31,6 +31,21 @@ function control_slot() {
 }
 function lock_call(method,args) { return ctx.ubus('mu300dash',method,args) ?? {error:'Network service unavailable'}; }
 function band_list(text) { return filter(map(split(text ?? '',','),b=>int(b)),b=>b>0); }
+function band_selection(locked, candidates) {
+    let values = band_list(locked), caps = band_list(candidates);
+    // Same as LuCI: zero mask or all supported bands means automatic. Raw
+    // mask bits outside the candidate list must never be resubmitted by UI.
+    if (!length(values) || (length(caps) && !length(filter(caps,b=>index(values,b)<0)))) return [];
+    return filter(values,b=>index(caps,b)>=0);
+}
+function band_summary(locked, candidates, prefix) {
+    let values = band_list(locked), caps = band_list(candidates);
+    if (!length(caps)) return L('频段能力暂不可用，请刷新','Band capabilities unavailable; refresh');
+    if (!length(values) || !length(filter(caps,b=>index(values,b)<0)))
+        return L(`自动（支持 ${length(caps)} 个）`,`Auto (${length(caps)} supported)`);
+    let bands = join(' ',map(values,b=>prefix+b));
+    return L(`已锁 ${length(values)} 个：${bands}`,`Locked ${length(values)}: ${bands}`);
+}
 
 
 const network = {
@@ -74,10 +89,14 @@ const network = {
             {id:'auto_apply',type:'toggle',label:L('开机自动应用','Apply on boot'),slot,value:!!data.auto_apply,
              note:L('AT 就绪、首次拨号前应用，与网页共用一份设置','Apply after AT is ready, before initial dialing; shared with the web')},
             {id:'lte_bands',type:state ? 'multi':'info',label:L('LTE 频段锁定','LTE band lock'),confirm:true,slot,
-             value:state ? band_list(data.lte?.locked) : null,options:map(band_list(caps.lte),b=>({value:b,label:'B'+b})),
+             value:state ? band_selection(data.lte?.locked,caps.lte) : null,options:map(band_list(caps.lte),b=>({value:b,label:'B'+b})),
+             display_value:state ? band_summary(data.lte?.locked,caps.lte,'B') : null,
+             none_label:L('自动','Auto'),
              note:L('都不选 = 不锁定','None selected = unlocked')},
             {id:'nr_bands',type:state ? 'multi':'info',label:L('NR 频段锁定','NR band lock'),confirm:true,slot,
-             value:state ? band_list(data.nr?.locked) : null,options:map(band_list(caps.nr),b=>({value:b,label:'n'+b})),
+             value:state ? band_selection(data.nr?.locked,caps.nr) : null,options:map(band_list(caps.nr),b=>({value:b,label:'n'+b})),
+             display_value:state ? band_summary(data.nr?.locked,caps.nr,'n') : null,
+             none_label:L('自动','Auto'),
              note:length(band_list(caps.nr)) ? L('都不选 = 不锁定','None selected = unlocked') : L('未获取到 NR 能力，请刷新；仍可解除锁定','NR capabilities unavailable; refresh or clear the lock')},
             {id:'bands_default',type:'action',label:L('恢复默认频段','Default bands'),confirm:true,slot},
             {id:'cell_lock',type:state ? 'choice':'info',label:L('锁定小区','Cell lock'),confirm:true,slot,

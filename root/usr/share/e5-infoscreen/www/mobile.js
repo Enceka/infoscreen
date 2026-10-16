@@ -244,6 +244,26 @@ window.T551M = (() => {
         const rates = document.querySelector('[data-title="overview"] .rates');
         rates.insertAdjacentHTML('afterbegin', '<div class="hero-label"><span id="hero-uptime-label">本次运行时长</span><span id="hero-uptime">—</span></div>');
         rates.insertAdjacentHTML('afterend', `<div id="home-usb" class="card home-usb" role="status" hidden><span class="home-usb-icon">${svg('usb')}</span><div><strong id="home-usb-title"></strong><small id="home-usb-detail"></small></div></div>`);
+        rates.insertAdjacentHTML('afterend', '<div id="home-boot" class="card home-boot" hidden><strong id="home-boot-title"></strong><p id="home-boot-note"></p><button id="home-boot-default" class="btn wide" type="button"></button></div>');
+        let confirmUntil = 0;
+        el('home-boot-default').onclick = async () => {
+            if (screenLocked || dark || bootBusy || last?.boot?.can_set_default !== true) return;
+            if (Date.now() > confirmUntil) {
+                confirmUntil = Date.now() + 5000;
+                toast(words('再按一次设为默认启动', 'Press again to make OpenWrt the default'));
+                return;
+            }
+            confirmUntil = 0; bootBusy = true;
+            el('home-boot-default').disabled = true;
+            try {
+                const result = await post('settings/system', {id:'default_boot', value:'linux'});
+                if (result?.ok) {
+                    if (last?.boot) last.boot = {...last.boot, default:'linux', temporary:false};
+                    el('home-boot').hidden = true;
+                    toast(words('已设为默认启动', 'Default boot saved'));
+                } else toast(words('设置失败，请重试', 'Failed to save; try again'));
+            } finally { bootBusy = false; }
+        };
         document.querySelector('[data-title="signal"] .cellhead').insertAdjacentHTML('afterend', `<div class="card sim-cards">${[0,1].map(slot => `<div class="sim-line" id="sim-line-${slot}"><div class="sim-heading"><b class="sim-slot">SIM ${slot+1}</b><strong id="sim-operator-${slot}">—</strong><span class="sim-role" id="sim-role-${slot}"></span></div><div class="sim-reading"><span id="sim-state-${slot}">—</span><strong id="sim-radio-${slot}">—</strong><span id="sim-signal-${slot}">—</span></div><small id="sim-note-${slot}"></small></div>`).join('')}</div>`);
         document.querySelector('[data-title="hotspot"] .qr').insertAdjacentHTML('afterbegin', '<div class="hotspot-qr-title" id="hotspot-scan-title">扫码即连</div><div id="hotspot-scan-note">用手机相机扫描，无需输入密码</div>');
         for (const span of ['day','mon']) {
@@ -319,7 +339,7 @@ window.T551M = (() => {
         if (mounted && !dark) paintUsage();
         if (screenLocked && !dark) usage();
     }
-    let supplyOnline = null;
+    let supplyOnline = null, bootBusy = false;
     window.addEventListener('e5-power-supply-change', () => {
         if (!mounted) return;
         // The kernel catches quick swaps between two status polls. Reuse the
@@ -355,6 +375,14 @@ window.T551M = (() => {
         if (dark) return;
         apply();
         clock();
+        const boot = data.boot || {};
+        el('home-boot').hidden = boot.temporary !== true;
+        setText('home-boot-title', words('当前为临时启动 OpenWrt', 'OpenWrt was booted temporarily'));
+        setText('home-boot-note', boot.can_set_default
+            ? words('是否设为默认启动？不会立即重启或断网。', 'Make it the default? No reboot or network interruption.')
+            : words('当前启动镜像不支持设置默认启动', 'This boot image cannot set a default boot'));
+        setText('home-boot-default', words('设为默认启动', 'Make default boot'));
+        el('home-boot-default').disabled = bootBusy || boot.can_set_default !== true;
         setText('hero-uptime-label', words('本次运行时长', 'Uptime'));
         setText('hero-uptime', data.system?.uptime == null ? '—' : fmtDuration(data.system.uptime));
         const usb = data.usb || {}, attached = usb.devices || [];
@@ -565,7 +593,7 @@ window.T551M = (() => {
             if (!mounted || keyKind(event) !== 'call' || T551MPower.isOpen() || window.T551MCalls?.active()) return;
             event.preventDefault(); event.stopImmediatePropagation();
             if (event.repeat || openingPhone) return;
-            if (blank) { setBlank(false); return; }
+            if (blank) return;
             if (lockedNow() || locked) return;
             resetIdle();
             menu(false, true);

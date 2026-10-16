@@ -3,7 +3,8 @@
  */
 'use strict';
 window.T551MPower = (() => {
-    let root, held = null, selected = null, busy = false, previousFocus;
+    let root, held = null, selected = null, busy = false, previousFocus, focusedButton;
+    let lastBack = -Infinity, lastMove = -Infinity;
     const wired = new WeakSet();
     const words = (zh, en) => document.documentElement.lang === 'en' ? en : zh;
     const actions = {
@@ -13,13 +14,38 @@ window.T551MPower = (() => {
     };
     const isOpen = () => !!root && !root.hidden;
     function cancelHold() { if (held) clearTimeout(held.timer); held = null; }
+    function buttons() {
+        return Array.from(root.querySelectorAll('button:not(:disabled)')).filter(b => b.getClientRects().length);
+    }
+    function remember(button) {
+        if (!button || !root.contains(button) || button.disabled) return;
+        focusedButton?.classList.remove('power-key-focus');
+        focusedButton = button;
+        focusedButton.classList.add('power-key-focus');
+    }
+    function focus(button) {
+        if (!button) return;
+        remember(button);
+        button.focus({preventScroll:true});
+        // Scroll only the sheet: background pages may be laid out off-screen.
+        const sheet = root.querySelector('.power-sheet');
+        const item = button.getBoundingClientRect(), box = sheet.getBoundingClientRect();
+        if (item.top < box.top) sheet.scrollTop -= box.top - item.top;
+        else if (item.bottom > box.bottom) sheet.scrollTop += item.bottom - box.bottom;
+    }
+    function currentButton() {
+        const list = buttons();
+        return list.includes(document.activeElement) ? document.activeElement
+            : list.includes(focusedButton) ? focusedButton : list.find(b => b.hasAttribute('data-cancel'));
+    }
     function close() {
         if (busy || !root) return;
         root.hidden = true;
         document.body.classList.remove('power-menu-open');
         selected = null;
+        focusedButton = null;
         resetIdle();
-        if (!T551M.isLocked() && previousFocus?.isConnected) previousFocus.focus();
+        if (!T551M.isLocked() && previousFocus?.isConnected) previousFocus.focus({preventScroll:true});
     }
     function paint() {
         root.innerHTML = `<div class="power-sheet" role="dialog" aria-modal="true" aria-labelledby="power-title">
@@ -27,7 +53,7 @@ window.T551MPower = (() => {
 ${selected ? `<p class="power-note">${selected === 'android_once' ? words('重启进入 Android，并将其设为默认启动系统。','Restart into Android and make it the default system.') : words('确认'+actions[selected].name()+'？','Confirm '+actions[selected].name().toLowerCase()+'?')}</p>
 <button class="power-confirm" data-confirm>${words('确认','Confirm')}</button>` : `<div class="power-actions">${Object.entries(actions).map(([id,a]) => `<button data-power="${id}"><span class="power-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${a.icon}"/></svg></span><span>${a.name()}</span><span class="power-chevron">›</span></button>`).join('')}</div>`}
 <p id="power-error" class="power-note" role="status" hidden></p><button class="power-cancel" data-cancel>${words('取消','Cancel')}</button></div>`;
-        root.querySelector('[data-cancel]').focus();
+        focus(root.querySelector('[data-cancel]'));
     }
     async function execute() {
         if (busy || !selected) return;
@@ -41,6 +67,15 @@ ${selected ? `<p class="power-note">${selected === 'android_once' ? words('重�
         busy = false;
         root.querySelectorAll('button').forEach(b => b.disabled = false);
         status.textContent = words('操作失败，请重试','Operation failed. Try again.');
+        focus(currentButton());
+    }
+    function activate(button) {
+        if (busy || !button || !root.contains(button) || button.disabled) return;
+        // Hardware confirmation is an action, not a synthetic touch click:
+        // a deliberately disabled touchscreen must not block the keypad.
+        if (button.hasAttribute('data-cancel')) { if (selected) { selected = null; paint(); } else close(); }
+        else if (Object.prototype.hasOwnProperty.call(actions, button.dataset.power)) { selected = button.dataset.power; paint(); }
+        else if (button.hasAttribute('data-confirm')) execute();
     }
     function open() {
         if (isOpen() || !root) return;
@@ -48,6 +83,7 @@ ${selected ? `<p class="power-note">${selected === 'android_once' ? words('重�
         if (blank) setBlank(false);
         clearTimeout(idleTimer);
         selected = null;
+        lastBack = lastMove = -Infinity;
         root.hidden = false;
         document.body.classList.add('power-menu-open');
         paint();
@@ -75,15 +111,34 @@ ${selected ? `<p class="power-note">${selected === 'android_once' ? words('重�
             }
             return;
         }
+        // Capture in both the shell and plugin frames, before the legacy
+        // any-key wake and call-key handlers. Only power wakes a dark lock.
+        if (blank && !['volup','voldown'].includes(kind)) {
+            event.preventDefault(); event.stopImmediatePropagation();
+            return;
+        }
         if (!isOpen()) return;
         event.preventDefault(); event.stopImmediatePropagation();
-        if (event.type !== 'keydown' || event.repeat || busy) return;
-        if (kind === 'back') { if (selected) { selected = null; paint(); } else close(); }
-        else if (kind === 'ok') document.activeElement?.click();
-        else if (['up','down','left','right'].includes(kind) || event.key === 'Tab') {
-            const buttons = Array.from(root.querySelectorAll('button:not(:disabled)'));
+        if (event.type !== 'keydown' || busy) return;
+        const navigation = ['up','down','left','right'].includes(kind) || event.key === 'Tab';
+        if (event.repeat && !navigation) return;
+        if (kind === 'back') {
+            const now = performance.now();
+            // Some keypads emit BrowserBack and Backspace for the same press.
+            if (now - lastBack < 150) return;
+            lastBack = now;
+            if (selected) { selected = null; paint(); } else close();
+        }
+        else if (kind === 'ok') activate(currentButton());
+        else if (navigation) {
+            const now = performance.now();
+            if (event.repeat && now - lastMove < 100) return;
+            lastMove = now;
+            const list = buttons();
+            if (!list.length) return;
             const step = ['up','left'].includes(kind) || event.shiftKey ? -1 : 1;
-            buttons[(buttons.indexOf(document.activeElement)+step+buttons.length)%buttons.length].focus();
+            const index = list.indexOf(currentButton());
+            focus(list[index < 0 ? (step > 0 ? 0 : list.length - 1) : (index+step+list.length)%list.length]);
         }
     }
     function attach(target) {
@@ -97,6 +152,7 @@ ${selected ? `<p class="power-note">${selected === 'android_once' ? words('重�
         root = document.createElement('div');
         root.id = 'power-menu'; root.hidden = true;
         document.body.appendChild(root);
+        root.addEventListener('focusin', event => remember(event.target.closest('button')));
         for (const name of ['touchstart','touchmove','touchend','pointerdown','pointermove','pointerup'])
             root.addEventListener(name, event => event.stopPropagation());
         root.addEventListener('click', event => {
@@ -104,9 +160,7 @@ ${selected ? `<p class="power-note">${selected === 'android_once' ? words('重�
             if (busy) return;
             const button = event.target.closest('button');
             if (!button) { if (event.target === root) close(); return; }
-            if (button.hasAttribute('data-cancel')) { if (selected) { selected = null; paint(); } else close(); }
-            else if (button.dataset.power) { selected = button.dataset.power; paint(); }
-            else if (button.hasAttribute('data-confirm')) execute();
+            activate(button);
         });
     }
     attach(window);

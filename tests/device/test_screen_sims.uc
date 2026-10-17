@@ -3,8 +3,8 @@ import { readfile } from 'fs';
 let build = loadstring('return function(readfile,sim_card,time) {\n' + readfile(ARGV[0]) + '\nreturn {sim_status,card_modem};\n};', {raw_mode:true})();
 let active=0, now=100;
 let data={sims:[
-    {slot:0,updated:99,operator:'CHN-UNICOM',tech:'lte',radio_label:'4G',signal:{rsrp:-91},registration:'camped'},
-    {slot:1,updated:99,operator:'46011',tech:'5gnr',radio_label:'5G SA',signal:{rsrp:-104},registration:'home'}]};
+    {slot:0,present:true,updated:99,operator:'CHN-UNICOM',tech:'lte',radio_label:'4G',signal:{rsrp:-91},registration:'camped'},
+    {slot:1,present:true,updated:99,operator:'46011',tech:'5gnr',radio_label:'5G SA',signal:{rsrp:-104},registration:'home'}]};
 let cache={card:0,ts:99,lte:{band:8,pci:143,earfcn:3740,rsrp:-90,rsrq:-12,sinr:3,bw:'10M'},reg:{stat:1}};
 let api=build(path=>path=='/proc/uptime' ? `${now} 0` : sprintf('%J',path=='/run/t551m-sims.json' ? data : cache),()=>active,()=>now);
 function check(ok,msg) { if (!ok) die(msg); }
@@ -40,4 +40,9 @@ check(m.signal.snr==4, 'Other slot SINR leaked into data card');
 data.sims[0].signal.snr=null;
 m=api.card_modem(mm,api.sim_status());
 check(m.signal.snr==null, 'Shared MM cell must not fabricate per-card SINR');
+data.sims[0]={slot:0,present:false,updated:99,registration:'absent',signal:{}};
+cache.card=0;
+m=api.card_modem({...mm,sim:true},api.sim_status());
+check(m.sim===false && m.operator==null && m.cell==null && m.tech==null,
+      'No SIM reused operator/cell from MM or dashboard');
 print('Per-SIM projection, data SIM selection, dashboard cache isolation and expiry: PASS\n');

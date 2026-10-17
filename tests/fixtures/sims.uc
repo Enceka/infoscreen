@@ -17,10 +17,16 @@ function card_modem(m, sims) {
 	// Never borrow the standby card's access technology or signal from MM.
 	let r = { ...m, tech: s.tech, radio_label: s.radio_label, signal: { ...(s.signal ?? {}) }, quality: null,
 		registration: s.registration == 'camped' ? 'unknown' : s.registration };
+	// A live CP can still advertise emergency camping with no SIM. The
+	// per-slot CPIN result takes precedence over an old MM SIM/operator cache.
+	if (!s.stale && s.present === false) {
+		r.sim = false; r.operator = null; r.cell = null;
+		return r;
+	}
 	if (r.cell?.type != (s.tech == '5gnr' ? '5gnr' : s.tech)) r.cell = null;
 	let cached = null;
 	try { cached = json(readfile('/tmp/unisoc-modem/sim' + sim_card() + '/sig.json') ?? readfile('/tmp/unisoc-modem/sig.json') ?? 'null'); } catch (e) {}
-	if (!s.stale && !s.error && cached?.card == sim_card() && !cached.error && !cached.partial && time()-cached.ts >= 0 && time()-cached.ts <= 10) {
+	if (!s.stale && s.present === true && !s.error && cached?.card == sim_card() && !cached.error && !cached.partial && time()-cached.ts >= 0 && time()-cached.ts <= 10) {
 		// Same serving-NR > LTE/AcT decision as the dashboard; no MM bitmask.
 		if (cached.nr?.band) {
 			r.tech = '5gnr'; r.radio_label = cached.lte?.band ? '5G NSA' : '5G SA';

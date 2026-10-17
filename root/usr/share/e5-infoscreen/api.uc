@@ -292,10 +292,23 @@ function wan_dev() {
 	return sim_card() ? 'sipa_eth8' : 'sipa_eth0';
 }
 
+function sim_counters(slot) {
+	if (!stat(`/sys/class/net/sipa_eth${slot * 8}`)) return {rx:null,tx:null};
+	let rx = 0, tx = 0;
+	for (let offset = 0; offset < 8; offset++) {
+		let path = `/sys/class/net/sipa_eth${slot * 8 + offset}`;
+		if (!stat(path)) continue;
+		let r = read_num(path + '/statistics/rx_bytes'), t = read_num(path + '/statistics/tx_bytes');
+		if (r == null || t == null) return {rx:null,tx:null};
+		rx += r; tx += t;
+	}
+	return {rx,tx};
+}
+
 function traffic() {
 	let dev = wan_dev();
-	let base = `/sys/class/net/${dev}/statistics/`;
-	let rx = read_num(base + 'rx_bytes'), tx = read_num(base + 'tx_bytes');
+	let counters = sim_counters(sim_card());
+	let rx = counters.rx, tx = counters.tx;
 	let t = now();
 	let prev = state_get('traffic');
 	// (another card's interface: its counters are not the previous poll's)
@@ -779,8 +792,7 @@ function traffic_usage(slot) {
 		slot, since:s.started_at, total:s.period, source:'unisoc.traffic',
 		days:map(reverse(slice(data.days ?? [],0,7)),d=>({date:substr(d.date,5),rx:d.rx,tx:d.tx}))
 	} : {available:false,slot,source:'unisoc.traffic',error:'traffic_unavailable'};
-	let net = `/sys/class/net/${slot == 1 ? 'sipa_eth8' : 'sipa_eth0'}/statistics/`;
-	wan.session = {rx:read_num(net + 'rx_bytes'),tx:read_num(net + 'tx_bytes')};
+	wan.session = sim_counters(slot);
 	return { ...wan, wan, lan: { available:false } };
 }
 
@@ -1351,10 +1363,16 @@ function card_modem(m, sims) {
 	// Never borrow the standby card's access technology or signal from MM.
 	let r = { ...m, tech: s.tech, radio_label: s.radio_label, signal: { ...(s.signal ?? {}) }, quality: null,
 		registration: s.registration == 'camped' ? 'unknown' : s.registration };
+	// A live CP can still advertise emergency camping with no SIM. The
+	// per-slot CPIN result takes precedence over an old MM SIM/operator cache.
+	if (!s.stale && s.present === false) {
+		r.sim = false; r.operator = null; r.cell = null;
+		return r;
+	}
 	if (r.cell?.type != (s.tech == '5gnr' ? '5gnr' : s.tech)) r.cell = null;
 	let cached = null;
 	try { cached = json(readfile('/tmp/unisoc-modem/sim' + sim_card() + '/sig.json') ?? readfile('/tmp/unisoc-modem/sig.json') ?? 'null'); } catch (e) {}
-	if (!s.stale && !s.error && cached?.card == sim_card() && !cached.error && !cached.partial && time()-cached.ts >= 0 && time()-cached.ts <= 10) {
+	if (!s.stale && s.present === true && !s.error && cached?.card == sim_card() && !cached.error && !cached.partial && time()-cached.ts >= 0 && time()-cached.ts <= 10) {
 		// Same serving-NR > LTE/AcT decision as the dashboard; no MM bitmask.
 		if (cached.nr?.band) {
 			r.tech = '5gnr'; r.radio_label = cached.lte?.band ? '5G NSA' : '5G SA';
@@ -1631,7 +1649,7 @@ global.handle_request = function(env) {
 			let a=query_args(env.QUERY_STRING ?? '');
 			if ((a.slot != '0' && a.slot != '1') || !match(a.id ?? '',/^[0-9a-f]{32}$/))
 				return reply_json(400,{ok:false,error:'Invalid network job'});
-			return reply_json(200,ubus_call('mu300dash','lock_status',a) ?? {ok:false,state:'error',error:'Network service unavailable'});
+			return reply_json(200,ubus_call('mu300dash',a.service=='sim'?'sim_status':'lock_status',a) ?? {ok:false,state:'error',error:'Network service unavailable'});
 		}
 		let sm = match(path, /^\/settings\/([a-z0-9:_-]+)$/);
 		if (sm) {
@@ -1643,7 +1661,7 @@ global.handle_request = function(env) {
 			let b = read_body(env);
 			let err = c.set(b.id, b.value, b.slot);
 			if (type(err) == 'object' && err.job)
-				return reply_json(200,{ok:true,pending:true,job:err.job,slot:err.slot});
+				return reply_json(200,{ok:true,pending:true,job:err.job,slot:err.slot,service:err.service});
 			let item = null;
 			for (let i in settings_items(c))
 				if (i.id == b.id) item = i;

@@ -2458,7 +2458,7 @@ function openApp(m) {
 	f.src = `/plugins/${encodeURIComponent(m.id)}/${m.entry ?? 'index.html'}?lang=${lang}${m.callOverlay ? '&callonly=1' : ''}`;
 	f.hidden = false;
 	f.onload = () => { if (appOpen !== m || f.hidden) return; T551M.app(f, m); observeAppInputs(f); f.focus({preventScroll:true}); };
-	setText('foot-title', lbl(m.name) || m.id);
+	setText('foot-title', lbl(m.short_name) || lbl(m.name) || m.id);
 	renderNotification();
 }
 

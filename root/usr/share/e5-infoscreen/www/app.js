@@ -731,7 +731,7 @@ function wanWord(st) {
 function renderBar(st) {
 	const m = st.modem;
 	setText('bar-sim', m.sim_card == null ? '' : String(m.sim_card + 1));
-	setText('bar-op', T551M.operator(m.operator) ?? (m.present ? t('searching') : t('no_modem')));
+	setText('bar-op', T551M.operator(m.operator) ?? (!m.present ? t('no_modem') : !m.sim ? t('no_sim') : t('searching')));
 	const tech = $('bar-tech');
 	setText('bar-tech', m.tech ? techName(m.tech) : '--');
 	tech.classList.toggle('off', !st.wan.up);
@@ -1274,7 +1274,7 @@ function showPage(n) {
 	page = (n + pages.length) % pages.length;
 	T551M.page(page);
 	pages.forEach((node, index) => node.classList.toggle('is-current', index == page));
-	$('pages').style.transform = `translateX(${-100 * page}%)`;
+	$('pages').style.transform = `translateX(${-100 * T551M.position(page)}%)`;
 	$('dots').innerHTML = pages.map((_, i) => `<i class="${i == page ? 'on' : ''}"></i>`).join('');
 	$('foot-title').textContent = t(pages[page].dataset.title);
 	if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
@@ -1407,8 +1407,8 @@ document.addEventListener('keydown', (e) => {
 	}
 	if (page == P.settings && stKey(kind)) return;
 	switch (kind) {
-	case 'left': showPage(page - 1); break;
-	case 'right': showPage(page + 1); break;
+	case 'left': T551M.step(-1); break;
+	case 'right': T551M.step(1); break;
 	case 'up': moveFocus(-1); break;
 	case 'down': moveFocus(1); break;
 	case 'ok':
@@ -1477,7 +1477,7 @@ document.addEventListener('touchend', (e) => {
 	const p = e.changedTouches[0];
 	const dx = p.clientX - touch.x, dy = p.clientY - touch.y;
 	if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy) && Date.now() - touch.t < 800)
-		showPage(page + (dx < 0 ? 1 : -1));
+		T551M.step(dx < 0 ? 1 : -1);
 	touch = null;
 }, true);
 
@@ -1783,6 +1783,31 @@ const lbl = (l) => errorText((l && typeof l == 'object') ? (l[lang] ?? l.zh ?? '
 
 function stTop() { return st[st.length - 1]; }
 
+let stWakeRequest = null, stWakeGeneration = 0;
+function stRefreshVisible() {
+	const generation = ++stWakeGeneration;
+	const v = stTop();
+	const visible = () => !blank && page == P.settings && !T551M.isLocked() && stTop() === v && v?.view == 'cat' && !v.saving;
+	if (!visible()) return;
+	if (stWakeRequest) {
+		// Several wake events may arrive during a slow read. Only the latest
+		// event gets one new read after it; do not display an older snapshot.
+		return stWakeRequest.then(() => {
+			if (generation === stWakeGeneration && visible()) return stRefreshVisible();
+		});
+	}
+	const path = '/api/settings/' + v.cat.id;
+	stWakeRequest = (async () => {
+		// A request started before sleep may contain an old snapshot. Finish
+		// it first, then make one fresh read; never replace an open editor.
+		await pageRequests.get(P.settings + ':' + path)?.catch(() => {});
+		if (!visible() || generation !== stWakeGeneration) return;
+		const r = await pageRead(path, P.settings).catch(() => null);
+		if (r && visible() && generation === stWakeGeneration) { v.items = r.items ?? []; stRender(); }
+	})().finally(() => { stWakeRequest = null; });
+	return stWakeRequest;
+}
+
 async function stOpen() {
 	if (!st.length) st = [{ view: 'menu' }];
 	stRender();
@@ -1976,11 +2001,11 @@ async function stPost(v, body) {
 		method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 	}).then((r) => r.json()).catch(() => null);
 	if (r?.pending && r.job) {
-		const job=r.job, slot=r.slot, until=Date.now()+245000;
+		const job=r.job, slot=r.slot, service=r.service||'lock', until=Date.now()+245000;
 		try {
 			while (Date.now()<until) {
 				await new Promise(resolve=>setTimeout(resolve,800));
-				r=await fetch('/api/network-job?id='+encodeURIComponent(job)+'&slot='+encodeURIComponent(slot),{cache:'no-store'}).then(r=>r.json());
+				r=await fetch('/api/network-job?id='+encodeURIComponent(job)+'&slot='+encodeURIComponent(slot)+'&service='+encodeURIComponent(service),{cache:'no-store'}).then(r=>r.json());
 				if (!['queued','running'].includes(r.state)) break;
 			}
 			if (r.state!=='done') r={ok:false,error:r.error || (lang=='zh'?'操作尚未完成，请刷新实际状态':'Operation incomplete; refresh actual state')};

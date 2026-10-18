@@ -20,6 +20,8 @@ The XKB rules are checked separately on OpenWrt with
 covering successful enumeration and failures without touching USB hardware.
 `sh tests/network-checks.sh` runs USB settings and Wi-Fi startup-state checks
 in a disposable OpenWrt Docker image (`E5_TEST_IMAGE` overrides the image).
+It uses the pinned common hotspot backend from the sibling device checkout;
+for a standalone infoscreen checkout, set `E5_DEVICE_COMMON` to that repository.
 `network-ui.cjs` uses the same Playwright setup to test the diagnostic button,
 recovery confirmation/result and failed hotspot display with mocked requests.
 

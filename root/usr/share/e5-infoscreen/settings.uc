@@ -664,6 +664,8 @@ const usb_cat = {
 	set: function(id, value) {
 		if (id == 'reset') return ctx.usb_reset_start();
 		if (id == 'check') return ctx.network_check();
+		if (index(['usb_role','usb_host_boot','usb_lan_auto','usb_net_mode','usb_net_scope','usb_net_auto'], id) < 0)
+			return 'no such setting';
 		let s = ctx.sh_json('/usr/libexec/unisoc-modem/device-usb get');
 		if (!s?.ok) return 'USB status unavailable';
 		let args;

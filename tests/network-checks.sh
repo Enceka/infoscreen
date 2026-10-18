@@ -2,6 +2,9 @@
 # Tests in a disposable OpenWrt userspace; no device or modem is contacted.
 set -eu
 TOP=$(cd "$(dirname "$0")/.." && pwd)
+DEVICE_COMMON=${E5_DEVICE_COMMON:-$TOP/../../device/openwrt_device_common}
+HOTSPOT="$DEVICE_COMMON/luci-app-t551m/root/usr/libexec/unisoc-modem/hotspot.uc"
+[ -f "$HOTSPOT" ] || { echo 'Set E5_DEVICE_COMMON to the pinned OpenWrt common repository' >&2; exit 1; }
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 python3 - "$TOP" "$T" <<'PY'
@@ -16,8 +19,14 @@ shutil.copytree(top / 'tests', temp / 'tests')
 source = (top / 'root/usr/share/e5-infoscreen/api.uc').read_text()
 source = source[source.index('function wifi_config()'):source.index('\nfunction clients()')]
 wrapper = 'return function(ctx) {\nconst cursor=ctx.cursor, ubus_call=ctx.ubus_call, state_get=ctx.state_get, state_put=ctx.state_put, stat=ctx.stat;\n'
-(temp / 'wifi-under-test.uc').write_text(wrapper + source + '\nreturn wifi_status;\n};\n')
+imports = "import * as hotspot from '/usr/libexec/unisoc-modem/hotspot.uc';\n"
+(temp / 'wifi-under-test.uc').write_text(imports + wrapper + source + '\nreturn wifi_status;\n};\n')
 (temp / 'bin').mkdir()
+(temp / 'controls').mkdir()
+for name in ('cpu-control', 'device-usb'):
+    path = temp / 'controls' / name
+    path.write_text('#!/bin/sh\n[ "$1" = get ] || exit 64\nprintf \'%s\\n\' \'{"ok":false,"available":false}\'\n')
+    path.chmod(0o755)
 for name, text in {
     'timeout': '#!/bin/sh\nshift; exec "$@"\n',
     'ubus': '#!/bin/sh\ncat /test/wireless.json\n',
@@ -27,6 +36,9 @@ for name, text in {
 (temp / 'wireless.json').write_text('{"radio0":{"up":false,"errors":[{"code":"NO_RADIO"}],"config":{"key":"must-not-appear","nested":{"password":"must-not-appear"}}}}')
 PY
 docker run --rm -v "$T/share":/usr/share/e5-infoscreen:ro \
+    -v "$HOTSPOT":/usr/libexec/unisoc-modem/hotspot.uc:ro \
+    -v "$T/controls/cpu-control":/usr/libexec/unisoc-modem/cpu-control:ro \
+    -v "$T/controls/device-usb":/usr/libexec/unisoc-modem/device-usb:ro \
     -v "$T/helpers":/helpers:ro \
     -v "$T/tests":/tests:ro -v "$T":/test \
     "${E5_TEST_IMAGE:-e5-openwrt-base:25.12.5}" \

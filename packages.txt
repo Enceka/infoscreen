@@ -13,3 +13,7 @@ fontconfig
 dejavu-fonts-ttf-DejaVuSans
 dejavu-fonts-ttf-DejaVuSans-Bold
 vnstat2
+# Native SIM, voice state and low-wakeup screen transports.
+glib2
+libjson-c5
+alsa-lib

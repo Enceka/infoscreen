@@ -93,6 +93,7 @@ window.T551M = (() => {
     const pageIcons = ['home','signal','traffic','sms','wifi','device','info','settings','apps'];
     let config = {}, mounted = false, screenLocked = true, dark = false;
     let gesture = null, blockUntil = 0, wakeAt = 0, animation = null;
+    let gestureFrame = null;
     let usageAt = -Infinity, usageBusy = false, cachedUsage = null;
     let usageGeneration = 0, usageSlot = null;
     let keyArmed = 0;
@@ -123,11 +124,9 @@ window.T551M = (() => {
         if (key === navKey) return;
         navKey = key;
         el('mobile-nav').innerHTML = items.map(i => `<button data-page="${i}">${svg(pageIcons[i])}<span data-page-label="${i}">${label(i)}</span></button>`).join('');
-        // CSS ordering preserves live iframe/DOM state and makes the existing
-        // lightweight slide animation follow the same order as the buttons.
+        // Keep DOM/iframe state intact; ordering also drives menu and swipe navigation.
         const order = pageOrder();
         order.forEach((id, index) => { pages[id].style.order = index; });
-        el('pages').style.transform = `translateX(${-100 * position(page)}%)`;
         el('mobile-menu').querySelectorAll('.mobile-grid [data-page]').forEach(node => {
             node.style.order = position(+node.dataset.page);
         });
@@ -185,7 +184,7 @@ window.T551M = (() => {
     function pageChanged(index) {
         if (!mounted) return;
         if (index !== P.traffic) closeTrafficPicker();
-        el('mobile-title').textContent = appOpen ? lbl(appOpen.short_name) || lbl(appOpen.name) || appOpen.id : label(index);
+        el('mobile-title').textContent = appOpen ? lbl(appOpen.name) || appOpen.id : label(index);
         const button = el('mobile-back'), icon = index === P.overview && !appOpen ? 'home' : 'back';
         if (button.dataset.icon !== icon) {
             button.innerHTML = svg(icon);
@@ -292,7 +291,6 @@ window.T551M = (() => {
             el('tf-'+span+'-rx').parentElement.insertAdjacentHTML('beforebegin', `<div class="traffic-used" id="tf-${span}-used">—</div>`);
             el('tf-'+span+'-lan-rx').parentElement.hidden = true;
         }
-        setInterval(() => { if (!dark) clock(); }, 1000);
         lock();
         apply();
     }
@@ -468,6 +466,8 @@ window.T551M = (() => {
         }
     }
     function resetGesture() {
+        cancelAnimationFrame(gestureFrame);
+        gestureFrame = null;
         gesture = null;
         el('mobile-lockscreen').classList.remove('dragging');
         el('mobile-lockscreen').style.transform = '';
@@ -507,6 +507,8 @@ window.T551M = (() => {
     }
     function unlock(velocity=0) {
         if (animation != null) return;
+        cancelAnimationFrame(gestureFrame);
+        gestureFrame = null;
         const remaining = innerHeight - (gesture ? Math.max(0, gesture.y-gesture.lastY) : 0);
         const ms = !duration() ? 0 : Math.max(140, Math.min(320, remaining / Math.max(1.5, velocity)));
         el('mobile-lockscreen').classList.remove('dragging');
@@ -522,6 +524,7 @@ window.T551M = (() => {
         if (!on && config.lock_enabled === false) finishUnlock();
         apply();
         if (!on && last) status(last);
+        if (!on) window.T551MCalls?.screenWake?.();
     }
     function start(x, y, count) {
         if (count != 1) { resetGesture(); return; }
@@ -544,9 +547,16 @@ window.T551M = (() => {
         const now = performance.now();
         gesture.samples.push({y,t:now});
         while (gesture.samples.length > 2 && now - gesture.samples[1].t > 120) gesture.samples.shift();
-        el('mobile-lockscreen').style.transform = `translate3d(0,${-distance}px,0)`;
-        el('mobile-lockscreen').style.opacity = String(Math.max(.25, 1 - distance / innerHeight * .85));
-        resetIdle();
+        // Several input samples can arrive before one display frame. Retain
+        // all samples for velocity, but paint only the newest position once.
+        if (gestureFrame === null) gestureFrame = requestAnimationFrame(() => {
+            gestureFrame = null;
+            if (!gesture) return;
+            const distance = Math.max(0, gesture.y - gesture.lastY);
+            el('mobile-lockscreen').style.transform = `translate3d(0,${-distance}px,0)`;
+            el('mobile-lockscreen').style.opacity = String(Math.max(.25, 1 - distance / innerHeight * .85));
+            resetIdle();
+        });
     }
     function end(x, y) {
         if (!gesture) return;
@@ -572,10 +582,11 @@ window.T551M = (() => {
             if (!mounted) return;
             if (T551MPower.isOpen()) {
                 if (event.target.closest?.('#power-menu') && !dark && config.touch !== false) return;
-                event.preventDefault(); event.stopImmediatePropagation(); return;
+                if (!name.startsWith('touch')) event.preventDefault();
+                event.stopImmediatePropagation(); return;
             }
             if (!lockedNow() && performance.now() >= blockUntil) return;
-            event.preventDefault();
+            if (!name.startsWith('touch')) event.preventDefault();
             event.stopImmediatePropagation();
             if (!screenLocked || dark || config.touch === false) return;
             if (name.startsWith('touch')) {
@@ -591,7 +602,7 @@ window.T551M = (() => {
                 else if (name == 'pointerup') end(event.clientX,event.clientY);
                 else if (name == 'pointercancel') resetGesture();
             }
-        }, {capture:true, passive:false});
+        }, {capture:true, passive:name.startsWith('touch')});
     }
     window.addEventListener('keydown', event => {
         if (!mounted || !screenLocked || dark) return;
@@ -768,5 +779,5 @@ window.T551M = (() => {
             row.classList.toggle('has-value', !!row.querySelector('.sv')?.textContent.trim());
         }
     }
-    return {boot, status, power, page:pageChanged, position, step, isLocked:lockedNow, operator, amount, speed, app, appClosed, settings, attachKeys, refreshUsage};
+    return {boot, status, power, clock, page:pageChanged, position, step, isLocked:lockedNow, operator, amount, speed, app, appClosed, settings, attachKeys, refreshUsage};
 })();

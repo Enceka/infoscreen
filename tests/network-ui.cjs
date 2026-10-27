@@ -14,7 +14,7 @@ const www=path.resolve(__dirname,'../root/usr/share/e5-infoscreen/www');
  ];
  await page.route('http://screen.test/**',async route=>{
   const p=new URL(route.request().url()).pathname;
-  if(p==='/api/status')return route.fulfill({json:{time:0,tz_offset:0,modem:{present:false,sim:false,signal:{}},wan:{up:false},traffic:{rx_total:0,tx_total:0,rx_rate:0,tx_rate:0},wifi:{enabled:true,up:false,state:'failed',error:'NO_RADIO'},clients:[],battery:{capacity:80},usb:{link:'host',reset:{busy}},system:{temperatures:{}},screen:{idle:60,brightness:120,lang:'zh',touch:true,donate_seen:true},sms:{unread:[]},notifications:[]}});
+  if(p==='/api/status')return route.fulfill({json:{time:0,tz_offset:0,modem:{present:false,sim:false,signal:{}},wan:{up:false},traffic:{rx_total:0,tx_total:0,rx_rate:0,tx_rate:0},wifi:{enabled:true,up:false,state:'failed',error:'NO_RADIO'},clients:[],battery:{capacity:80},usb:{link:'host',reset:{busy}},system:{temperatures:{}},screen:{idle:60,brightness:120,lang:'zh',touch:true,donate_seen:true,lock_enabled:false},sms:{unread:[]},notifications:[]}});
   if(p==='/api/settings')return route.fulfill({json:{categories:[{id:'usb',label:{zh:'USB'}}]}});
   if(p==='/api/settings/usb'){
    if(route.request().method()==='POST'){
@@ -31,7 +31,7 @@ const www=path.resolve(__dirname,'../root/usr/share/e5-infoscreen/www');
  async function physical(key){await page.evaluate(key=>document.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true})),key);}
  await page.goto('http://screen.test/index.html');await page.waitForFunction(()=>document.getElementById('ov-wifi').textContent.includes('未启动'));
  await physical('5');assert.equal(await page.locator('#hs-qr').getAttribute('data-off'),'NO_RADIO');
- await physical('8');await page.waitForSelector('[data-st="cat:0"]');await page.click('[data-st="cat:0"]');
+ await physical('8');await page.waitForSelector('[data-st="cat:0"]');await page.waitForTimeout(400);await page.click('[data-st="cat:0"]');
  await page.waitForSelector('[data-st="item:check"]');assert.equal(resets,0,'viewing diagnostics reset hardware');
  await page.click('[data-st="item:check"]');await page.waitForFunction(()=>document.getElementById('st-view').textContent.includes('热点尚未运行'));
  assert.equal(checked,1);assert.equal(resets,0);

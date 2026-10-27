@@ -9,7 +9,7 @@ const www=path.resolve(__dirname,'../root/usr/share/e5-infoscreen/www');
   const url=new URL(route.request().url()),p=url.pathname;
   if(p.startsWith('/api/')){
    if(route.request().method()==='POST')actions.push(p);
-   if(p==='/api/status')return route.fulfill({json:{time:0,tz_offset:0,modem:{present:false,sim:false,signal:{}},wan:{up:false},traffic:{rx_total:0,tx_total:0,rx_rate:0,tx_rate:0},wifi:{enabled:false},clients:[],battery:{capacity:80},usb:{},system:{temperatures:{}},screen:{idle:60,brightness:120,lang:'zh',touch:true,donate_seen:true},sms:{unread:[]},notifications:notices}});
+   if(p==='/api/status')return route.fulfill({json:{time:0,tz_offset:0,modem:{present:false,sim:false,signal:{}},wan:{up:false},traffic:{rx_total:0,tx_total:0,rx_rate:0,tx_rate:0},wifi:{enabled:false},clients:[],battery:{capacity:80},usb:{},system:{temperatures:{}},screen:{idle:60,brightness:120,lang:'zh',touch:true,donate_seen:true,lock_enabled:false},sms:{unread:[]},notifications:notices}});
    if(p==='/api/plugins')return route.fulfill({json:{plugins}});
    if(p==='/api/update')return route.fulfill({json:{current:'1.5.0',available:false}});
    return route.fulfill({json:{ok:true,categories:[]}});

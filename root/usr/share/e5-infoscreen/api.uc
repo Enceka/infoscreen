@@ -41,7 +41,6 @@ import { cursor } from 'uci';
 import * as hotspot from '/usr/libexec/unisoc-modem/hotspot.uc';
 
 const WLAN_DEV = 'wlan0';
-const USB_HOST_MAC = '02:50:00:00:e5:02';   // the gadget's host_addr
 const MODEM_TTL = 10;                        // seconds
 const KEY_LOG = '/tmp/e5-infoscreen-keys.log';
 // e5-linux's OpenWrt: e5-sms-notify keeps the unread messages here
@@ -106,6 +105,15 @@ function sh_json(cmd) {
 function read_trim(path) {
 	let s = readfile(path);
 	return (s == null) ? null : trim(s);
+}
+
+// ucode binds function names at definition time: read_trim must precede this.
+function image_version() {
+	try {
+		let version = json(readfile('/etc/unisoc-ota/current.json') ?? 'null')?.version;
+		if (type(version) == 'string' && length(version)) return version;
+	} catch (e) {}
+	return read_trim('/etc/e5/image-version');
 }
 
 function read_num(path) {
@@ -382,6 +390,28 @@ function wifi_status() {
 	};
 }
 
+// Gadget host addresses are chosen by the board/installer, not by this UI.
+// Follow only configured function links; an unlinked previous USB mode must
+// not make a stale DHCP lease look like a connected computer. Cached only for
+// this HTTP request, so the next request sees a replug or protocol change.
+let usbHostMacs = null;
+function usb_host_macs() {
+	if (usbHostMacs != null)
+		return usbHostMacs;
+	usbHostMacs = {};
+	for (let path in glob('/sys/kernel/config/usb_gadget/*/configs/*/*/host_addr')) {
+		// Some configfs versions include a C terminator after the 17-byte MAC.
+		let mac = lc(substr(trim(readfile(path) ?? ''), 0, 17));
+		if (match(mac, /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/))
+			usbHostMacs[mac] = true;
+	}
+	return usbHostMacs;
+}
+
+function is_usb_host(mac) {
+	return exists(usb_host_macs(), lc(mac ?? ''));
+}
+
 function clients() {
 	// the stations, from hostapd: this Wi-Fi driver has no station dump, so
 	// iwinfo's assoclist (nl80211) is always empty
@@ -406,7 +436,7 @@ function clients() {
 		let via = null;
 		if (exists(wifi, mac))
 			via = 'wifi';
-		else if (mac == USB_HOST_MAC && usb_up)
+		else if (is_usb_host(mac) && usb_up)
 			via = 'usb';
 		if (!via || seen[mac])
 			continue;
@@ -496,7 +526,7 @@ function usb_status() {
 	let ip = null;
 	for (let line in split(readfile('/tmp/dhcp.leases') ?? '', '\n')) {
 		let f = split(line, ' ');
-		if (length(f) >= 3 && lc(f[1]) == USB_HOST_MAC)
+		if (length(f) >= 3 && is_usb_host(f[1]))
 			ip = f[2];
 	}
 	let n = '/sys/class/net/usb0/statistics/';
@@ -974,7 +1004,7 @@ function advanced_base() {
 		device: {
 			model: ubus_call('system', 'board')?.model ?? null,
 			os: rel.DISTRIB_DESCRIPTION,
-			image: read_trim('/etc/e5/image-version'),
+			image: image_version(),
 			kernel: read_trim('/proc/sys/kernel/osrelease'),
 			disk: disk('/'),    // the Debian image for the directory form, the own image standalone
 			thermal: thermal(),
@@ -1078,7 +1108,7 @@ function make_ctx(ns) {
 		api_version: API_VERSION,
 		notify: n => notice_store(ns, n),
 		clear_notification: id => notice_store(ns, { id, clear: true }),
-		sh, sh_json, read_trim, read_num, payload_ints,
+		sh, sh_json, read_trim, read_num, payload_ints, image_version,
 		at,
 		at_console,
 		ubus: ubus_call,
@@ -1281,7 +1311,7 @@ function devices() {
 	for (let line in split(readfile('/tmp/dhcp.leases') ?? '', '\n')) {
 		let f = split(line, ' ');
 		if (length(f) >= 4)
-			add(f[1], f[2], (f[3] != '*') ? f[3] : null, (lc(f[1]) == USB_HOST_MAC) ? 'usb' : 'wifi');
+			add(f[1], f[2], (f[3] != '*') ? f[3] : null, is_usb_host(f[1]) ? 'usb' : 'wifi');
 	}
 	for (let mac in keys(blocked))
 		add(mac, null, null, null);
@@ -1344,6 +1374,14 @@ function qos_status(m) {
 	return v;
 }
 
+function boot_status() {
+    let state = read_trim('/etc/e5linux/default-boot') ?? 'android';
+    if (state != 'linux' && state != 'android') state = 'unknown';
+    let trial = match(read_trim('/proc/cmdline') ?? '', /(^| )e5\.openwrt=/) != null;
+    let control = stat('/run/e5linux/misc-bc-slot-b-trial.bin') ?? stat('/etc/e5linux/misc-bc-slot-b-trial.bin');
+    return { default: state, temporary: state == 'unknown' ? null : state != 'linux',
+             can_set_default: !trial && control != null && stat('/opt/e5/e5-next-boot') != null };
+}
 // Independent card readings, refreshed outside the HTTP request path.
 function sim_status() {
 	let data = null;
@@ -1394,15 +1432,6 @@ function card_modem(m, sims) {
 	let rsrp = r.signal.rsrp;
 	if (rsrp != null) r.quality = max(0, min(100, (rsrp + 120) * 2.5));
 	return r;
-}
-
-function boot_status() {
-    let state = read_trim('/etc/e5linux/default-boot') ?? 'android';
-    if (state != 'linux' && state != 'android') state = 'unknown';
-    let trial = match(read_trim('/proc/cmdline') ?? '', /(^| )e5\.openwrt=/) != null;
-    let control = stat('/run/e5linux/misc-bc-slot-b-trial.bin') ?? stat('/etc/e5linux/misc-bc-slot-b-trial.bin');
-    return { default: state, temporary: state == 'unknown' ? null : state != 'linux',
-             can_set_default: !trial && control != null && stat('/opt/e5/e5-next-boot') != null };
 }
 
 function status() {
@@ -1660,8 +1689,13 @@ global.handle_request = function(env) {
 				return reply_json(200, { id: c.id, label: c.label, items: settings_items(c) });
 			let b = read_body(env);
 			let err = c.set(b.id, b.value, b.slot);
+			if (c.id == 'system' && type(err) == 'object' &&
+			    err.power_action == b.id && index(['reboot','poweroff','android_once'], b.id) >= 0)
+				return reply_json(200, { ok: true, power_action: b.id });
 			if (type(err) == 'object' && err.job)
 				return reply_json(200,{ok:true,pending:true,job:err.job,slot:err.slot,service:err.service});
+			if (err)
+				return reply_json(400, { ok: false, error: err });
 			let item = null;
 			for (let i in settings_items(c))
 				if (i.id == b.id) item = i;

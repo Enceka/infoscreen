@@ -11,13 +11,13 @@ import threading
 import time
 import unittest
 
-TOP = Path(__file__).resolve().parents[4]
+TOP = Path(__file__).resolve().parents[2]
 
 
 class ScreenAPN(unittest.TestCase):
     def test_shared_crud_sim_binding_themes_and_failure(self):
         from playwright.sync_api import sync_playwright
-        sources = runpy.run_path(str(TOP / 'ci/infoscreen/tools/stage.py'))['sources']()
+        sources = runpy.run_path(str(TOP / 'tools/stage.py'))['sources']()
         status = dict(sims=[], time=int(time.time()), tz_offset=0, clock='',
                       modem={'sim_card':0}, wan={}, traffic={'rx_rate':0,'tx_rate':0,'rx_total':0,'tx_total':0},
                       wifi={}, clients=[], battery={}, usb={}, system={}, sms={'unread':[]}, notifications=[],
@@ -39,7 +39,7 @@ class ScreenAPN(unittest.TestCase):
             threading.Thread(target=server.serve_forever,daemon=True).start()
             try:
                 with sync_playwright() as pw:
-                    browser=pw.chromium.launch(executable_path=os.environ.get('E5_TEST_BROWSER'),channel=os.environ.get('MU300_BROWSER_CHANNEL') or None,headless=True)
+                    browser=pw.chromium.launch(channel=os.environ.get('MU300_BROWSER_CHANNEL','msedge'),headless=True)
                     page=browser.new_page(viewport={'width':320,'height':480},has_touch=True)
                     errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
                     def route(request):

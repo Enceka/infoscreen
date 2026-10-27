@@ -8,7 +8,7 @@ const www=path.resolve(__dirname,'../root/usr/share/e5-infoscreen/www');
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('http://screen.test/**',async route=>{
   const p=new URL(route.request().url()).pathname;
-  if(p==='/api/status')return route.fulfill({json:{time:0,tz_offset:0,modem:{present:false,sim:false,signal:{}},wan:{up:false},traffic:{rx_total:0,tx_total:0,rx_rate:0,tx_rate:0},wifi:{enabled:false},clients:[],battery:{capacity:80},usb:{},system:{temperatures:{}},screen:{idle:60,brightness:120,lang:'zh',touch:true,donate_seen:true},sms:{unread,screen:true},notifications:[]}});
+  if(p==='/api/status')return route.fulfill({json:{time:0,tz_offset:0,modem:{present:false,sim:false,signal:{}},wan:{up:false},traffic:{rx_total:0,tx_total:0,rx_rate:0,tx_rate:0},wifi:{enabled:false},clients:[],battery:{capacity:80},usb:{},system:{temperatures:{}},screen:{idle:60,brightness:120,lang:'zh',touch:true,donate_seen:true,lock_enabled:false},sms:{unread,screen:true},notifications:[]}});
   if(p==='/api/sms')return route.fulfill({json:{messages}});
   if(p==='/api/sms-read'){reads++;unread=[];return route.fulfill({json:{ok:true}});}
   if(p.startsWith('/api/'))return route.fulfill({json:{ok:true,plugins:[],available:false}});

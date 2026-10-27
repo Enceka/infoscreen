@@ -1,0 +1,35 @@
+{
+  "format": 1,
+  "builder": "7bd379c416dbb2e048bbd095b1281b28c2106b68322b46a2b9b1d7dfa5024f63",
+  "sdk": {
+    "volume": "e5-openwrt-src",
+    "toolchain": "toolchain-aarch64_generic_gcc-14.3.0_musl",
+    "image": "debian:trixie"
+  },
+  "targets": {
+    "t551m-screen-power": {
+      "sources": {
+        "screen-power.c": "a5d24773c48ccc130a9e02472329ac3dd48fb469cc271bc247a0d01c76c1764d"
+      },
+      "sha256": "a10a8224b5c092599260beb27d4c2e84b5e23e2b1fff5c3f47f9ec04b45dbf99"
+    },
+    "t551m-sim-status": {
+      "sources": {
+        "sim-status.c": "9072f01d46d939ae85bbf0cae52d2ac3cc07f363fb09b564d3fafa5c6a4c268b",
+        "native-common.c": "35c5c1315ac7acd7993e968d3d3cf07d19b88156b98e6ae839bff8fc827ee257",
+        "native.h": "5e21e7c5bd610c697f2e2e5e0e9bea21540fa70b8b0c9076fda4e357dea8178f"
+      },
+      "sha256": "ca5660c5f6d96c51d957e4b42e99f924ac1e8034e2ced71a81b97c9ad9422313"
+    },
+    "e5-voice-native": {
+      "sources": {
+        "voice.c": "9fbc123d661e4357c63d8eee483fcfde4efe0e5c778f1e135f5a94e7c20d9502",
+        "voice-hardware.c": "24ae2555cbd2f8547fcc3ba5ee9aa413b153b887af5e0f994b480d92e197dbda",
+        "screen-http.c": "5e8389c97ba7019d6ef7d0a08a912cfefa9a2cb519ad7d70a915d3b6dc097be3",
+        "native-common.c": "35c5c1315ac7acd7993e968d3d3cf07d19b88156b98e6ae839bff8fc827ee257",
+        "native.h": "5e21e7c5bd610c697f2e2e5e0e9bea21540fa70b8b0c9076fda4e357dea8178f"
+      },
+      "sha256": "088945ccc7a0e4f7f49d260efdb8d14ca6b267b2eb1ec40fa30bbc177de4dae8"
+    }
+  }
+}

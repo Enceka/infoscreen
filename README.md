@@ -1,5 +1,12 @@
 # e5-infoscreen
 
+This branch carries the current Minikano OpenWrt screen integration for E5,
+T551M, M8, T512N, Yuanhang 41S, K1 and LYM-10K. See
+[integration and build notes](docs/MINIKANO-INTEGRATION.zh-CN.md) and the exact
+[E5 source record](docs/E5-SOURCE.json). It requires the matching E5 firmware
+backend; it is not a new generic screen release. The default branch, release
+version and published update feed are unchanged.
+
 The shared mobile UI and screen services for E5, T551M and M8 are now integrated here.
 See [device integration](docs/DEVICE-INTEGRATION.md) for source commits, compatibility and runtime dependencies.
 The parent project uses this repository as a pinned submodule; `tools/stage.py --root DIR` installs committed assets into an offline root.

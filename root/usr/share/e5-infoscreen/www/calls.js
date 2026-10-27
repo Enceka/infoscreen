@@ -19,9 +19,8 @@ window.T551MCalls = (() => {
             },{capture:true,passive:false});
     }
     function update(data) {
-        const removed=data.phone_installed===false;
-        if(!removed && (data.error || !Array.isArray(data.calls)))return;
-        const calls=removed?[]:data.calls.filter(c=>live.has(c.state));
+        if(data.error || !Array.isArray(data.calls))return;
+        const calls=data.calls.filter(c=>live.has(c.state));
         const incoming=calls.filter(c=>c.state==='ringing-in'||c.state==='waiting');
         const fresh=incoming.some(c=>!ringing.has(String(c.id)));
         ringing=new Set(incoming.map(c=>String(c.id)));
@@ -55,6 +54,11 @@ window.T551MCalls = (() => {
         if(latest)listener(latest);
         return ()=>listeners.delete(listener);
     }
+    function screenWake() {
+        // An incoming call with wake=false is still retained by the stream.
+        // Manual/external wake must show it even if no new call event arrives.
+        if (!stopped && !blank && latest) update(latest);
+    }
     async function pollCalls() {
         clearTimeout(pollTimer);pollTimer=null;
         if(stopped || streaming || polling)return;
@@ -62,9 +66,6 @@ window.T551MCalls = (() => {
         const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),2500);
         try {
             const response=await fetch('/api/plugins/phone/live',{cache:'no-store',signal:controller.signal});
-            if(response.status===404 && !streaming && !stopped) {
-                deliver({phone_installed:false,calls:[]});return;
-            }
             const data=await response.json();
             if(response.ok && !streaming && !stopped)deliver(data);
         } catch(_) {} finally {
@@ -81,7 +82,7 @@ window.T551MCalls = (() => {
             stream.onmessage=event=>{
                 try {
                     const data=JSON.parse(event.data);
-                    if(data.phone_installed!==false && (data.error || !Array.isArray(data.calls))) {streaming=false;pollCalls();return;}
+                    if(data.error || !Array.isArray(data.calls)) {streaming=false;pollCalls();return;}
                     streaming=true;clearTimeout(pollTimer);pollTimer=null;deliver(data);
                 }catch(_) {streaming=false;pollCalls();}
             };
@@ -91,5 +92,5 @@ window.T551MCalls = (() => {
     }
     window.addEventListener('pagehide',()=>{stopped=true;stream?.close();clearTimeout(pollTimer);listeners.clear();});
     window.addEventListener('pageshow',event=>{if(event.persisted){stopped=false;booted=false;boot();}});
-    return {active,update,attach,boot,subscribe};
+    return {active,update,attach,boot,subscribe,screenWake};
 })();

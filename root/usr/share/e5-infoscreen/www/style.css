@@ -74,23 +74,43 @@ html, body {
 	content: ""; position: absolute; right: -4px; top: 2.5px;
 	width: 2px; height: 4px; background: var(--text); border-radius: 0 1px 1px 0;
 }
-.bat b { position: absolute; left: 1px; top: 1px; bottom: 1px; width: 0; background: var(--good); }
+.bat b { position: absolute; left: 1px; right: 1px; top: 1px; bottom: 1px; border-radius: 1px; transform: scaleX(0); transform-origin: left center; background: var(--good); }
 .bat.low b { background: var(--poor); }
 .bat.charging b { background: var(--accent); }
 
-/* pages side by side, one on screen */
+/* Keep pages in one viewport. A moving multi-page raster can flash on WPE. */
 #pages {
 	position: absolute; top: 30px; bottom: 26px; left: 0; right: 0;
-	display: flex;
-	transition: transform 0.25s ease;
+	display: block;
+	overflow: hidden;
 }
 .page {
-	flex: 0 0 100%;
+	position: absolute; inset: 0;
+	visibility: hidden;
+	pointer-events: none;
 	height: 100%;
 	padding: 8px;
 	overflow-y: auto;
 	display: flex; flex-direction: column; gap: 7px;
 }
+.page.is-outgoing { visibility: visible; animation: page-leave .24s cubic-bezier(.22,.75,.2,1) both; }
+.page.is-current { visibility: visible; pointer-events: auto; z-index: 1; }
+.page.is-entering { animation: page-enter .24s cubic-bezier(.22,.75,.2,1) both; }
+.page.is-entering,.page.is-outgoing { will-change: transform; }
+.page:not(.is-current):not(.is-outgoing) { display: none; }
+/* Keep vertical drag and inertia on WebKit's native scrolling path. */
+.page { touch-action: pan-y; overscroll-behavior-y: contain; }
+body.blank, body.notouch { touch-action: none; }
+@keyframes page-enter {
+	from { transform: translate3d(calc(var(--page-direction) * 100%),0,0); }
+	to { transform: translate3d(0,0,0); }
+}
+@keyframes page-leave {
+	from { transform: translate3d(0,0,0); }
+	to { transform: translate3d(calc(var(--page-direction) * -100%),0,0); }
+}
+body.no-motion .page.is-entering,body.no-motion .page.is-outgoing { animation: none; }
+@media (prefers-reduced-motion: reduce) { .page.is-entering,.page.is-outgoing { animation: none; } }
 .page::-webkit-scrollbar { display: none; }
 
 .card {

@@ -447,6 +447,21 @@ const PLATFORM_ERRORS = [
     "Ayar yeniden bağlantıdan sonra korunmadı"
   ],
   [
+    "Cannot read standby radio state",
+    "无法读取备用卡射频状态",
+    "Yedek SIM radyo durumu okunamıyor"
+  ],
+  [
+    "Cannot read modem state before reconnect",
+    "重连前无法读取模组状态",
+    "Yeniden bağlantı öncesinde modem durumu okunamıyor"
+  ],
+  [
+    "Radio reconnect timed out",
+    "射频重连超时",
+    "Radyo yeniden bağlantısı zaman aşımına uğradı"
+  ],
+  [
     "Another network operation is still running",
     "另一个网络操作仍在执行",
     "Başka bir ağ işlemi hâlâ çalışıyor"
@@ -502,6 +517,58 @@ const PLATFORM_ERRORS = [
     "Böyle bir ayar yok"
   ]
 ];
+PLATFORM_ERRORS.push(...[
+  [
+    "Enable the target SIM radio before switching",
+    "请先开启目标 SIM 的射频，再切换上网卡",
+    "Geçişten önce hedef SIM radyosunu açın"
+  ],
+  [
+    "This SIM radio is disabled by the user",
+    "该卡射频已被用户禁用",
+    "Bu SIM radyosu kullanıcı tarafından kapatılmış"
+  ],
+  [
+    "Invalid saved SIM radio policy",
+    "已保存的 SIM 射频设置无效",
+    "Kaydedilmiş SIM radyo ayarları geçersiz"
+  ],
+  [
+    "Radio setting saved; modem command failed:",
+    "设置已保存，但基带执行失败：",
+    "Radyo ayarı kaydedildi; modem komutu başarısız:"
+  ],
+  [
+    "Radio setting saved; RF readback not confirmed",
+    "设置已保存，但未能确认射频状态",
+    "Radyo ayarı kaydedildi; modem durumu doğrulanamadı"
+  ],
+  [
+    "Radio setting saved; target SIM is not ready",
+    "设置已保存，目标 SIM 尚未就绪",
+    "Radyo ayarı kaydedildi; hedef SIM henüz hazır değil"
+  ],
+  [
+    "Radio setting saved; RF enable failed",
+    "设置已保存，但射频开启失败",
+    "Radyo ayarı kaydedildi; radyo açılamadı"
+  ],
+  [
+    "Radio setting saved; RF disable failed",
+    "设置已保存，但射频关闭失败",
+    "Radyo ayarı kaydedildi; radyo kapatılamadı"
+  ],
+  [
+    "Radio setting failed",
+    "射频设置失败",
+    "Radyo ayarı başarısız"
+  ],
+  [
+    "Invalid radio request",
+    "射频设置请求无效",
+    "Radyo isteği geçersiz"
+  ]
+]);
 const PLATFORM_CODES = {
     invalid_slot:'Select a valid SIM slot', confirmation_required:'Confirmation is required',
     storage_failed:'Could not save traffic records', traffic_unavailable:'Traffic service unavailable',
@@ -707,9 +774,18 @@ function setText(id, s) {
 	if (el && el.textContent !== s) el.textContent = s;
 }
 
+function setStyle(el, property, value) {
+	if (el && el.style[property] !== value) el.style[property] = value;
+}
+
+const renderedHTML = new WeakMap();
 function setHTML(id, html) {
 	const el = $(id);
-	if (el && el.innerHTML !== html) el.innerHTML = html;
+	if (!el || renderedHTML.get(el) === html) return;
+	// Browser serialization and settings icons decorate this HTML. Compare
+	// the render input, otherwise unchanged refreshes rebuild whole lists.
+	if (el.innerHTML !== html) el.innerHTML = html;
+	renderedHTML.set(el, html);
 }
 
 function esc(s) {
@@ -744,7 +820,7 @@ function renderBar(st) {
 
 	const b = st.battery, bat = $('bar-bat');
 	const cap = b.capacity ?? 0;
-	bat.querySelector('b').style.width = Math.round(cap / 100 * 17) + 'px';
+	setStyle(bat.querySelector('b'), 'transform', `scaleX(${Math.max(0, Math.min(100, cap)) / 100})`);
 	bat.classList.toggle('low', cap <= 15 && chargeState(b) != 'charging');
 	bat.classList.toggle('charging', chargeState(b) == 'charging');
 	setText('bar-batpct', b.capacity == null ? '--' : cap + '%');
@@ -825,13 +901,13 @@ function fmtTemp(value) {
 // "used / total · n%" and a bar: green, yellow from 75 %, red from 90 %
 function usage(id, used, total) {
 	const bar = $(id + '-bar');
-	if (used == null || !total) { setText(id, '--'); if (bar) bar.style.width = '0'; return; }
+	if (used == null || !total) { setText(id, '--'); setStyle(bar, 'width', '0%'); return; }
 	const pct = Math.min(100, Math.round(used / total * 100));
 	const [u, uu] = fmtBytes(used), [tt, tu] = fmtBytes(total);
 	setText(id, `${u} ${uu} / ${tt} ${tu} · ${pct}%`);
 	if (bar) {
-		bar.style.width = pct + '%';
-		bar.style.background = pct >= 90 ? 'var(--poor)' : pct >= 75 ? 'var(--fair)' : 'var(--good)';
+		setStyle(bar, 'width', pct + '%');
+		setStyle(bar, 'background', pct >= 90 ? 'var(--poor)' : pct >= 75 ? 'var(--fair)' : 'var(--good)');
 	}
 }
 
@@ -845,8 +921,8 @@ function renderSignal(st) {
 		const g = grade(kind, v);
 		setText('sg-' + kind, v == null ? '--' : `${v.toFixed(1)}${unit} · ${t(g.word)}`);
 		const bar = $('sg-' + kind + '-bar');
-		bar.style.width = g ? Math.round(g.frac * 100) + '%' : '0';
-		bar.style.background = g ? GRADE_COLOR[g.word] : '';
+		setStyle(bar, 'width', g ? Math.round(g.frac * 100) + '%' : '0%');
+		setStyle(bar, 'background', g ? GRADE_COLOR[g.word] : '');
 	}
 	setText('sg-pci', c?.pci == null ? '--' : String(c.pci));
 	setText('sg-arfcn', c?.arfcn == null ? '--' : String(c.arfcn));
@@ -944,13 +1020,20 @@ function localParts(ms) {
 	         h: d.getUTCHours(), mi: d.getUTCMinutes(), s: d.getUTCSeconds() };
 }
 
-// the status bar's clock ticks here, every second: the page has the device's
-// time zone (the session passes TZ) and the time is NTP's
+// The status bar and lock share the device's time zone and NTP wall time.
+let clockTimer = null;
 function tickClock() {
+	clearTimeout(clockTimer);
+	clockTimer = null;
+	if (blank) return;
 	const d = localParts(), p2 = (n) => String(n).padStart(2, '0');
 	setText('bar-clock', `${p2(d.h)}:${p2(d.mi)}` + (last?.screen?.clock_seconds ? `:${p2(d.s)}` : ''));
+	window.T551M?.clock();
+	// Both clocks share one timer. A minute-only clock needs no second ticks;
+	// align to wall time so NTP/time-zone changes settle on the next repaint.
+	const period = last?.screen?.clock_seconds ? 1000 : 60000;
+	clockTimer = setTimeout(tickClock, period - ((Date.now() + (last?.tz_offset ?? 0) * 1000) % period));
 }
-setInterval(() => { if (!blank) tickClock(); }, 1000);
 
 /* ---------- data ---------- */
 
@@ -1015,7 +1098,12 @@ function pageRead(path, index, type = 'json') {
 	let failed = false;
 	const request = fetch(path, { cache: 'no-store', signal: controller.signal }).then(async response => {
 		if (!response.ok) throw new Error('HTTP ' + response.status);
-		return type == 'text' ? await response.text() : await response.json();
+		if (type == 'text') return await response.text();
+		const value = await response.json();
+		// Some uhttpd handlers return an error envelope with HTTP 200. Treat it
+		// as a failed read so the page shows its retry message, not empty data.
+		if (value?.error && Object.keys(value).length === 1) throw new Error(String(value.error));
+		return value;
 	}).catch(error => { failed = true; throw error; }).finally(() => {
 		clearTimeout(timer); pageRequests.delete(key); done(failed);
 	});
@@ -1023,8 +1111,21 @@ function pageRead(path, index, type = 'json') {
 	return request;
 }
 
+let pollRequest = null, pollAgain = false;
 async function poll() {
 	clearTimeout(pollTimer);
+	if (pollRequest) { pollAgain = true; return pollRequest; }
+	pollRequest = readStatus();
+	try { await pollRequest; }
+	finally {
+		pollRequest = null;
+		// A wake/event during a slow read needs one fresh follow-up, rather
+		// than another concurrent request and another permanent poll loop.
+		pollTimer = setTimeout(poll, pollAgain ? 0 : blank ? POLL_BLANK : POLL_AWAKE);
+		pollAgain = false;
+	}
+}
+async function readStatus() {
 	const done = last == null ? beginPageLoad(P.overview) : () => {};
 	const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 25000);
 	let failed = false;
@@ -1042,6 +1143,8 @@ async function poll() {
 				blank = !st.screen.awake;
 				T551M.power(blank);
 				document.body.classList.toggle('blank', blank);
+				tickClock();
+				schedulePageRefresh();
 				resetIdle();
 			}
 			T551M.status(st);
@@ -1065,7 +1168,6 @@ async function poll() {
 	}
 	clearTimeout(timeout);
 	done(failed);
-	pollTimer = setTimeout(poll, blank ? POLL_BLANK : POLL_AWAKE);
 }
 
 function post(path, body) {
@@ -1183,6 +1285,8 @@ function setBlank(on) {
 	powerQueue = powerQueue.catch(() => {}).then(() => post('backlight', { level })).then(r => {
 		if (!r?.ok) throw new Error('screen power transition failed');
 	}).catch(e => { console.log(e); toast(lang == 'zh' ? '屏幕状态同步失败，请按电源键重试' : 'Press power to retry'); });
+	tickClock();
+	schedulePageRefresh();
 	if (!on) {
 		if (last) render(last);
 		poll();
@@ -1270,11 +1374,38 @@ function keyLock(power, star) {
 
 /* ---------- navigation ---------- */
 
+let pageRefreshGeneration = 0;
+function schedulePageRefresh() {
+	clearTimeout(advTimer);
+	advTimer = null;
+	const generation = ++pageRefreshGeneration;
+	if (blank || ![P.traffic, P.adv_info].includes(page)) return;
+	advTimer = setTimeout(async () => {
+		try { await (page == P.traffic ? loadTraffic() : loadAdvanced()); }
+		finally { if (generation === pageRefreshGeneration) schedulePageRefresh(); }
+	}, 30000);
+}
+
+let pageTransitionTimer;
 function showPage(n) {
+	const previous = page;
 	page = (n + pages.length) % pages.length;
 	T551M.page(page);
-	pages.forEach((node, index) => node.classList.toggle('is-current', index == page));
-	$('pages').style.transform = `translateX(${-100 * T551M.position(page)}%)`;
+	clearTimeout(pageTransitionTimer);
+	pages.forEach((node, index) => {
+		node.classList.remove('is-outgoing', 'is-entering');
+		node.classList.toggle('is-current', index == page);
+	});
+	if (previous !== page) {
+		// Two viewport-sized layers move together; never rasterize the full
+		// multi-page strip or blend text from different pages.
+		$('pages').style.setProperty('--page-direction', T551M.position(page) > T551M.position(previous) ? 1 : -1);
+		pages[previous].classList.add('is-outgoing');
+		pages[page].classList.add('is-entering');
+		pageTransitionTimer = setTimeout(() => {
+			pages.forEach(node => node.classList.remove('is-outgoing', 'is-entering'));
+		}, 260);
+	}
 	$('dots').innerHTML = pages.map((_, i) => `<i class="${i == page ? 'on' : ''}"></i>`).join('');
 	$('foot-title').textContent = t(pages[page].dataset.title);
 	if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
@@ -1290,13 +1421,11 @@ function showPage(n) {
 	} else if (smsOpen != null) {
 		closeSms();
 	}
-	clearInterval(advTimer);
+	schedulePageRefresh();
 	if (page == P.traffic) {
 		loadTraffic();
-		advTimer = setInterval(() => { if (!blank) loadTraffic(); }, 30000);
 	} else if (page == P.adv_info) {
 		loadAdvanced();
-		advTimer = setInterval(() => { if (!blank) loadAdvanced(); }, 30000);
 	} else if (showIds) {
 		hideIds();
 	}
@@ -1333,7 +1462,7 @@ function moveFocus(dir) {
 		pg.scrollBy({ top: dir * 80, behavior: 'smooth' });
 		return;
 	}
-	list[i].focus();
+	list[i].focus({ preventScroll: true });
 	list[i].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
@@ -1442,10 +1571,10 @@ let keyClick = false;
 for (const ev of ['touchstart', 'touchmove', 'touchend', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click'])
 	window.addEventListener(ev, (e) => {
 		if (touchOff() && !(ev == 'click' && keyClick)) {
-			e.preventDefault();
+			if (!ev.startsWith('touch')) e.preventDefault();
 			e.stopImmediatePropagation();
 		}
-	}, { capture: true, passive: false });
+	}, { capture: true, passive: ev.startsWith('touch') });
 
 function pressKey(el) {
 	keyClick = true;
@@ -1462,24 +1591,38 @@ function applyTouch() {
 let touch = null;
 document.addEventListener('touchstart', (e) => {
 	if (blank) {
-		e.preventDefault();
 		e.stopPropagation();
 		touch = null;
 		return;
 	}
 	resetIdle();
+	if (e.touches.length !== 1 || e.target.closest('input,textarea,select,[contenteditable="true"]')) {
+		touch = null;
+		return;
+	}
 	const p = e.touches[0];
-	touch = { x: p.clientX, y: p.clientY, t: Date.now() };
-}, { capture: true, passive: false });
+	touch = { x: p.clientX, y: p.clientY, t: Date.now(), axis: null };
+}, { capture: true, passive: true });
+
+document.addEventListener('touchmove', (e) => {
+	if (!touch) return;
+	if (e.touches.length !== 1) { touch = null; return; }
+	const p = e.touches[0], dx = Math.abs(p.clientX - touch.x), dy = Math.abs(p.clientY - touch.y);
+	if (!touch.axis && Math.max(dx, dy) >= 8) touch.axis = dx > dy * 1.5 ? 'x' : 'y';
+	// Once a list starts scrolling, a thumb's sideways arc cannot change page.
+}, { capture: true, passive: true });
 
 document.addEventListener('touchend', (e) => {
 	if (!touch) return;
+	if (e.touches.length) { touch = null; return; }
 	const p = e.changedTouches[0];
 	const dx = p.clientX - touch.x, dy = p.clientY - touch.y;
-	if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy) && Date.now() - touch.t < 800)
+	if (touch.axis !== 'y' && Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy) && Date.now() - touch.t < 800)
 		T551M.step(dx < 0 ? 1 : -1);
 	touch = null;
-}, true);
+	resetIdle();
+}, { capture: true, passive: true });
+document.addEventListener('touchcancel', () => { touch = null; }, { capture: true, passive: true });
 
 document.addEventListener('mousedown', () => { if (!blank) resetIdle(); }, true);
 
@@ -1984,8 +2127,8 @@ function stRender() {
 	}
 	const focused = document.activeElement?.dataset?.st;
 	setHTML('st-view', html);
-	if (v.view == 'apnedit') stAPNBind(v);
 	T551M.settings($('st-view'), v, stCats);
+	if (v.view == 'apnedit') stAPNBind(v);
 	if (focused) {
 		const el = document.querySelector(`[data-st="${CSS.escape(focused)}"]`);
 		if (el) el.focus();
@@ -2000,6 +2143,13 @@ async function stPost(v, body) {
 	let r = await fetch('/api/settings/' + v.cat.id, {
 		method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 	}).then((r) => r.json()).catch(() => null);
+	if (r?.ok && v.cat.id == 'system' && r.power_action === body.id &&
+		['reboot', 'poweroff', 'android_once'].includes(body.id)) {
+		// Keep the confirmation guard, and do not refresh a departing backend.
+		done(false);
+		toast(t('at_running'));
+		return r;
+	}
 	if (r?.pending && r.job) {
 		const job=r.job, slot=r.slot, service=r.service||'lock', until=Date.now()+245000;
 		try {
@@ -2155,8 +2305,8 @@ async function stClick(key, el) {
 			stRender();
 		} else if (it.type == 'action') {
 			if (it.confirm && !stConfirm(key, el)) return;
-			await stPost(v, { id: it.id });
-			stLoadCat(v);
+			const result = await stPost(v, { id: it.id });
+			if (!result?.power_action) stLoadCat(v);
 		} else if (it.type == 'image') {
 			picOpen(it.src, lbl(it.caption), () => el?.focus());
 		} else if (it.type == 'choice' || it.type == 'number' || it.type == 'multi') {
@@ -2483,7 +2633,7 @@ function openApp(m) {
 	f.src = `/plugins/${encodeURIComponent(m.id)}/${m.entry ?? 'index.html'}?lang=${lang}${m.callOverlay ? '&callonly=1' : ''}`;
 	f.hidden = false;
 	f.onload = () => { if (appOpen !== m || f.hidden) return; T551M.app(f, m); observeAppInputs(f); f.focus({preventScroll:true}); };
-	setText('foot-title', lbl(m.short_name) || lbl(m.name) || m.id);
+	setText('foot-title', lbl(m.name) || m.id);
 	renderNotification();
 }
 
@@ -2703,3 +2853,155 @@ on('notification-open', 'click', async () => {
  const m = response?.plugins?.find(m => m.id === n.plugin);
  if (m) { if (appOpen) closeApp(); openApp(m); renderNotification(); }
 });
+
+/* APN management uses the same public RPC as LuCI. No AT or password reads. */
+const APN_TEXT = {
+    title:['接入点 APN','Access points (APN)','Erişim noktaları (APN)'],
+    add:['添加接入点','Add access point','Erişim noktası ekle'], edit:['编辑','Edit','Düzenle'],
+    remove:['删除','Delete','Sil'], use:['切换','Use','Kullan'], active:['当前使用','Current','Etkin'],
+    automatic:['自动匹配当前 SIM','Match current SIM automatically','Mevcut SIM için otomatik eşleştir'],
+    refresh:['刷新','Refresh','Yenile'], name:['名称','Name','Ad'], protocol:['IP 协议','IP protocol','IP protokolü'],
+    auth:['鉴权方式','Authentication','Kimlik doğrulama'], none:['无鉴权','None','Yok'],
+    user:['用户名','Username','Kullanıcı adı'], password:['密码','Password','Parola'],
+    keep:['留空保留原密码','Leave blank to keep saved password','Kayıtlı parolayı korumak için boş bırakın'],
+    clear:['清除已保存密码','Clear saved password','Kayıtlı parolayı sil'],
+    save:['保存','Save','Kaydet'], cancel:['取消','Cancel','İptal'], default:['SIM 默认','SIM default','SIM varsayılanı'],
+    current:['当前配置','Current configuration','Mevcut yapılandırma'], empty:['暂无接入点，请添加','No access points; add one','Erişim noktası yok; bir tane ekleyin'],
+    scope:['应用于当前上网卡，不切换 SIM。切换 APN 会短暂中断蜂窝连接。','Applies to the data SIM without switching SIMs. Changing APN briefly interrupts cellular data.','SIM değiştirmeden veri SIM’ine uygulanır. APN değişimi mobil bağlantıyı kısa süre keser.'],
+    remembered:['已按当前 SIM 保存选择','Selection saved for this SIM','Seçim bu SIM için kaydedildi'],
+    global:['正在使用全局接口配置','Using global interface configuration','Genel arayüz yapılandırması kullanılıyor'],
+    save_note:['保存只更新列表；切换后才会应用。','Saving only updates the list; choose Use to apply.','Kaydetmek yalnızca listeyi günceller; uygulamak için Kullan’ı seçin.'],
+    auto_note:['按运营商匹配公网 APN，未知运营商使用 SIM 默认。专网或物联卡请手动设置。','Matches public APNs by operator; unknown operators use SIM defaults. Configure private APNs manually.','Operatöre göre genel APN eşleştirilir; bilinmeyen operatörlerde SIM varsayılanı kullanılır. Özel APN’leri elle ayarlayın.'],
+    auth_note:['当前固件暂不支持 APN 鉴权；可以保存配置，但不能应用需要鉴权的接入点。','This firmware cannot apply authenticated APNs yet. Such profiles can still be saved.','Bu yazılım henüz kimlik doğrulamalı APN’leri uygulayamıyor. Profiller yine de kaydedilebilir.'],
+    apn_invalid:['接入点参数无效','Invalid access point settings','Geçersiz erişim noktası ayarları'],
+    apn_missing:['接入点已不存在，请刷新','Access point no longer exists; refresh','Erişim noktası artık yok; yenileyin'],
+    apn_identity:['无法读取当前 SIM 身份，请稍后刷新','Current SIM identity unavailable; refresh later','Mevcut SIM kimliği okunamıyor; daha sonra yenileyin'],
+    apn_sim_changed:['上网卡已改变，请刷新后重新确认','Data SIM changed; refresh and confirm again','Veri SIM’i değişti; yenileyip yeniden onaylayın'],
+    apn_unavailable:['APN 服务暂不可用，请重试','APN service unavailable; retry','APN hizmeti kullanılamıyor; tekrar deneyin'],
+    apn_storage:['接入点保存失败','Could not save access point','Erişim noktası kaydedilemedi'],
+    apn_auth_unsupported:['此固件暂不支持 APN 鉴权','APN authentication is unsupported by this firmware','Bu yazılım APN kimlik doğrulamasını desteklemiyor'],
+    apn_reload:['配置已保存，但应用失败，请刷新后重试','Configuration saved, but applying failed; refresh and retry','Ayarlar kaydedildi ancak uygulanamadı; yenileyip tekrar deneyin'],
+    apn_busy:['另一项网络操作仍在执行，请稍后重试','Another network operation is running; retry later','Başka bir ağ işlemi sürüyor; daha sonra tekrar deneyin'],
+    apn_bound:['此接入点仍被 SIM 使用，不能删除','A SIM still uses this access point; cannot delete','Bir SIM bu erişim noktasını kullanıyor; silinemez'],
+    apn_current:['请先切换，再删除当前接入点','Switch before deleting the current access point','Etkin erişim noktasını silmeden önce değiştirin'],
+    apn_duplicate:['相同配置的接入点已存在','An access point with these settings already exists','Bu ayarlara sahip erişim noktası zaten var'],
+    apn_limit:['最多保存 32 个接入点','Up to 32 access points can be saved','En fazla 32 erişim noktası kaydedilebilir'],
+    apn_unsaved:['网络配置有未应用更改，请先保存或撤销','Save or discard pending network changes first','Önce bekleyen ağ değişikliklerini kaydedin veya iptal edin'],
+    apn_scope:['当前 SIM 已保存选择，请按卡应用','This SIM has a saved selection; apply per SIM','Bu SIM’in kayıtlı seçimi var; SIM’e göre uygulayın'],
+    apn_unsupported:['当前蜂窝接口不支持 APN 管理','Cellular interface does not support APN management','Mobil arayüz APN yönetimini desteklemiyor']
+};
+function apnText(key) { return (APN_TEXT[key] ?? APN_TEXT.apn_unavailable)[lang == 'en' ? 1 : lang == 'tr' ? 2 : 0]; }
+function apnName(p) { return p.id == 'automatic' && p.name == 'SIM default' ? apnText('default') : p.name; }
+function apnButton(action, label, disabled=false, active=false) {
+    return `<button type="button" class="btn apn-button${active ? ' active' : ''}" data-st="${esc(action)}"${disabled ? ' disabled' : ''}>${esc(label)}</button>`;
+}
+function stAPNRender(v) {
+    if (v.view == 'apnedit') {
+        const p=v.draft, busy=!!v.parent.saving;
+        const field=(key,label,type='text',max=64) => `<label class="apn-field"><span>${esc(label)}</span><input data-apn-field="${key}" type="${type}" maxlength="${max}" value="${esc(p[key] ?? '')}" autocomplete="${type=='password'?'new-password':'off'}" spellcheck="false"${key=='name'?' required':''}${key=='password' && v.has_password ? ` placeholder="${esc(apnText('keep'))}"` : ''}></label>`;
+        const choices=(key,values) => `<div class="apn-field"><span>${esc(apnText(key=='pdptype'?'protocol':'auth'))}</span><div class="apn-choices" role="group">${values.map(([value,label])=>apnButton(`apnfield:${key}:${value}`,label,busy,p[key]==value)).join('')}</div></div>`;
+        return `<form id="screen-apn-form" class="card apn-editor" onsubmit="return false"><fieldset${busy?' disabled':''}>`+
+            field('name',apnText('name'))+field('apn','APN','text',100)+
+            choices('pdptype',[['IPV4V6','IPv4 / IPv6'],['IP','IPv4']])+
+            choices('auth',[['none',apnText('none')],['pap','PAP'],['chap','CHAP'],['papchap','PAP / CHAP']])+
+            field('username',apnText('user'))+field('password',apnText('password'),'password')+
+            (v.has_password ? `<label class="apn-clear"><input type="checkbox" data-apn-field="clear_password"${p.clear_password?' checked':''}><span>${esc(apnText('clear'))}</span></label>` : '')+
+            `<p class="stnote">${esc(apnText('save_note'))}</p><div class="apn-actions">`+
+            apnButton('apn:save',apnText('save'),busy)+apnButton('apn:cancel',apnText('cancel'),busy)+`</div></fieldset></form>`;
+    }
+    const data=v.apn, busy=!!v.saving || !!v.loading;
+    let html=`<div class="apn-actions">${apnButton('apn:refresh',apnText('refresh'),busy)}${apnButton('apn:add',apnText('add'),busy || !data?.ok)}</div>`;
+    if (v.error) html+=`<p class="stnote apn-error" role="alert">${esc(apnText(v.error))}</p>`;
+    if (!data?.ok) return html;
+    const ready=data.identity_ready && [0,1].includes(data.data_sim);
+    html+=`<div class="card apn-summary"><strong>SIM ${data.data_sim==null?'—':data.data_sim+1}</strong><span>${esc(apnText('current'))}</span><b>${esc(data.current?.apn || apnText('default'))}</b><span>${esc(data.current?.pdptype=='IP'?'IPv4':'IPv4 / IPv6')}</span><p class="stnote">${esc(apnText(data.remembered?'remembered':'global'))}</p></div>`+
+        apnButton('apn:auto',apnText('automatic'),busy || !ready)+`<p class="stnote">${esc(apnText('scope'))}</p>`;
+    if (!ready) html+=`<p class="stnote">${esc(apnText('apn_identity'))}</p>`;
+    if (!data.auth_supported) html+=`<p class="stnote">${esc(apnText('auth_note'))}</p>`;
+    if (!data.profiles?.length) html+=`<p class="stnote">${esc(apnText('empty'))}</p>`;
+    for (const [i,p] of (data.profiles ?? []).entries()) {
+        const unsupported=!data.auth_supported && p.auth && p.auth!='none';
+        html+=`<article class="card apn-profile${p.current?' current':''}"><div class="apn-profile-head"><strong>${esc(apnName(p))}</strong>${p.current?`<span class="apn-badge">${esc(apnText('active'))}</span>`:''}</div><div class="apn-value">${esc(p.apn || apnText('default'))}</div><div class="sub">${p.pdptype=='IP'?'IPv4':'IPv4 / IPv6'} · ${esc(p.auth && p.auth!='none'?p.auth.toUpperCase():apnText('none'))}</div><div class="apn-actions">`+
+            apnButton(`apn:use:${i}`,apnText('use'),busy || !ready || unsupported)+
+            apnButton(`apn:edit:${i}`,apnText('edit'),busy)+
+            apnButton(`apn:delete:${i}`,apnText('remove'),busy || p.current)+`</div></article>`;
+    }
+    return html;
+}
+function stAPNBind(v) {
+    $('screen-apn-form')?.addEventListener('input', e => {
+        const key=e.target.dataset.apnField;
+        if (key) v.draft[key]=e.target.type=='checkbox'?e.target.checked:e.target.value;
+    });
+}
+async function stAPNLoad(v) {
+    if (v.loading || v.saving) return;
+    v.loading=true;
+    if (stTop()===v) stRender();
+    try {
+        const data=await pageRead('/api/apn',P.settings);
+        if (data?.ok) {v.apn=data;v.error=null;v.observedSlot ??= data.data_sim;}
+        else v.error=data?.error || 'apn_unavailable';
+    } catch(e) {v.error='apn_unavailable';}
+    finally {v.loading=false;if (stTop()===v) stRender();}
+}
+function stAPNSync(status) {
+    const v=stTop(), raw=status?.modem?.sim_card;
+    if (raw==null || raw==='') return;
+    const slot=Number(raw);
+    if (page===P.settings && !blank && v?.view=='apn' && v.apn &&
+        [0,1].includes(slot) && v.observedSlot!==slot && !v.saving && !v.loading) {
+        v.observedSlot=slot;stAPNLoad(v);
+    }
+}
+async function stAPNChange(v,action,payload) {
+    if (v.saving || v.loading) return null;
+    v.saving=true;stDisarm();stRender();
+    const done=beginPageLoad(P.settings);
+    let r;
+    try {
+        r=await fetch('/api/apn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,payload})}).then(r=>r.json());
+        toast(r?.ok ? t('saved') : apnText(r?.error || 'apn_unavailable'));
+    } catch(e) {r={ok:false,error:'apn_unavailable'};toast(apnText(r.error));}
+    finally {v.saving=false;done(!r?.ok);}
+    if (r?.ok || r?.saved || r?.error=='apn_sim_changed') await stAPNLoad(v);
+    return r;
+}
+async function stAPNClick(v,key,el) {
+    const [kind,action,index]=key.split(':');
+    if (v.saving || v.parent?.saving || v.loading) return;
+    if (kind=='apnfield' && v.view=='apnedit') {
+        if (action=='pdptype' && ['IP','IPV4V6'].includes(index) || action=='auth' && ['none','pap','chap','papchap'].includes(index)) {
+            v.draft[action]=index;stRender();
+        }
+        return;
+    }
+    if (kind!='apn') return;
+    if (action=='cancel') {stDisarm();st.pop();stRender();return;}
+    if (action=='refresh') {stDisarm();await stAPNLoad(v);return;}
+    if (action=='save' && v.view=='apnedit') {
+        if (!$('screen-apn-form')?.reportValidity() || !v.draft.name.trim()) return;
+        const p=v.draft, payload={id:p.id,name:p.name.trim(),apn:p.apn.trim(),pdptype:p.pdptype,auth:p.auth,username:p.username,roaming:p.pdptype,attach:'0'};
+        if (p.clear_password || p.password || !v.has_password) payload.password=p.clear_password?'':p.password;
+        const r=await stAPNChange(v.parent,'save',payload);
+        if (r?.ok && stTop()===v) st.pop();
+        stRender();return;
+    }
+    if (v.view!='apn') return;
+    const p=v.apn?.profiles?.[+index];
+    if (action=='add' || action=='edit') {
+        if (!v.apn?.ok || action=='edit' && !p) return;
+        stDisarm();
+        st.push({view:'apnedit',item:{label:apnText(action=='add'?'add':'edit')},parent:v,has_password:!!p?.has_password,
+            draft:{id:p?.id || '',name:p?.name || '',apn:p?.apn || '',pdptype:p?.pdptype || 'IPV4V6',auth:p?.auth || 'none',username:p?.username || '',password:'',clear_password:false}});
+        stRender();return;
+    }
+    if (!['auto','use','delete'].includes(action) || action!='auto' && !p) return;
+    if (!stConfirm(key,el)) return;
+    if (action=='delete') {await stAPNChange(v,'delete',{id:p.id});}
+    else {
+        if (!v.apn.identity_ready || ![0,1].includes(v.apn.data_sim)) {toast(apnText('apn_identity'));return;}
+        await stAPNChange(v,action=='auto'?'auto':'apply',{...(p?{id:p.id}:{}),remember:true,data_sim:v.apn.data_sim});
+    }
+    if (stTop()===v) stRender();
+}

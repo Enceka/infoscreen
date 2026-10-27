@@ -6,11 +6,13 @@ from pathlib import Path
 import shutil
 import subprocess
 import unittest
+import os
+import sys
 
-TOP=Path(__file__).resolve().parents[4]
-spec=importlib.util.spec_from_file_location('sims',((Path(__file__).resolve().parent / '../../root/usr/libexec/t551m-sim-status')), loader=importlib.machinery.SourceFileLoader('sims', str(Path(__file__).resolve().parent / '../../root/usr/libexec/t551m-sim-status')))
-sims=importlib.util.module_from_spec(spec);spec.loader.exec_module(sims)
-PARSER=TOP/'device/openwrt_device_common/luci-app-t551m/root/usr/libexec/unisoc-modem/operator.uc'
+TOP=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(TOP/'tests'))
+from native_support import Simulator
+PARSER=Path(os.environ['INFOSCREEN_DASHBOARD_PARSER']) if os.environ.get('INFOSCREEN_DASHBOARD_PARSER') else None
 CASES=[]
 for name in ['中国联通','中国移动','中国电信','中国广电','CHN-UNICOM','Vodafone','Café','12','A\\B','A"B','📶']:
     CASES.append(('UCS2','0',name.encode('utf-16-be').hex().upper(),name))
@@ -37,6 +39,10 @@ CASES += [
 ]
 
 class Operators(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):cls.sims=Simulator()
+    @classmethod
+    def tearDownClass(cls):cls.sims.close()
     def check_cases(self, web):
         for charset,fmt,raw,expected in CASES:
             with self.subTest(charset=charset,format=fmt,raw=raw):
@@ -44,14 +50,14 @@ class Operators(unittest.TestCase):
                 if web:
                     result=json.loads(subprocess.check_output(['ucode',str(PARSER),reply],text=True))
                     self.assertEqual(result,{'name':None if fmt=='2' else expected or None,'plmn':(expected or None) if fmt=='2' else None,'act':7})
-                else:self.assertEqual(sims.operator_name(reply),expected or None)
+                else:self.assertEqual(self.sims.operator_name(reply),expected or None)
     def test_screen(self):self.check_cases(False)
-    @unittest.skipUnless(shutil.which('ucode'),'Run on OpenWrt/ucode for dashboard parser')
+    @unittest.skipUnless(shutil.which('ucode') and PARSER and PARSER.is_file(),'Set INFOSCREEN_DASHBOARD_PARSER and supply ucode for the separate dashboard comparison')
     def test_dashboard(self):self.check_cases(True)
     def test_no_operator(self):
         for reply in ['','ERROR','+COPS: 0\nOK']:
-            self.assertIsNone(sims.operator_name(reply))
-            if shutil.which('ucode'):
+            self.assertIsNone(self.sims.operator_name(reply))
+            if shutil.which('ucode') and PARSER and PARSER.is_file():
                 self.assertIsNone(json.loads(subprocess.check_output(['ucode',str(PARSER),reply],text=True)))
 
 if __name__=='__main__':unittest.main()

@@ -18,7 +18,7 @@ class ScreenAPN(unittest.TestCase):
                     marker.parent.mkdir(parents=True);marker.write_text(profile+'\n')
                     screen['stage'](root)
                     base=root/'usr/share/e5-infoscreen'
-                    self.assertIn('function stAPNRender', (base/'www/apn.js').read_text(encoding='utf-8'))
+                    self.assertIn('function stAPNRender', (base/'www/app.js').read_text(encoding='utf-8'))
                     self.assertIn("ubus_call('mu300dash','apn_set'",(base/'api.uc').read_text(encoding='utf-8'))
                     self.assertIn('.apn-editor',(base/'www/mobile.css').read_text(encoding='utf-8'))
                     self.assertIn("category:'apn'",(base/'settings.uc').read_text(encoding='utf-8'))

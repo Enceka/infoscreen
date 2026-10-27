@@ -1,0 +1,36 @@
+#!/bin/sh
+# Verified screen archive -> atomic per-file replacement, including running ELF.
+set -eu
+archive=${1:?archive}; root=${2:-/}
+[ -d "$root" ] || { echo 'Target root is unavailable' >&2; exit 1; }
+root=$(cd "$root" && pwd)
+work=$(mktemp -d "${TMPDIR:-/tmp}/infoscreen-files.XXXXXX")
+pending=
+trap '[ -z "$pending" ] || rm -f "$pending"; rm -rf "$work"' EXIT
+tar -tzvf "$archive" > "$work/list"
+awk '{print substr($1,1,1)}' "$work/list" | grep -qv '^[-d]$' && { echo 'Archive links/special files are forbidden' >&2; exit 1; }
+tar -tzf "$archive" | sed 's|^\./||' | grep -v '^$' > "$work/names"
+grep -qE '(^|/)\.\.(/|$)|^/' "$work/names" && { echo 'Unsafe archive path' >&2; exit 1; }
+grep -qvE '^(usr|www|etc)(/|$)' "$work/names" && { echo 'Unexpected screen archive path' >&2; exit 1; }
+grep -qE '^etc/(config|e5-infoscreen)(/|$)' "$work/names" && { echo 'User data must be preserved' >&2; exit 1; }
+mkdir "$work/payload"
+tar -xzf "$archive" -C "$work/payload"
+[ "$(du -sk "$work/payload" | cut -f1)" -le 20480 ] || { echo 'Unpacked archive is too large' >&2; exit 1; }
+while IFS= read -r name; do
+    # An installed application is user data, even through its web-root link.
+    case "$name" in usr/share/e5-infoscreen/www/plugins/*)
+        tail=${name#usr/share/e5-infoscreen/www/plugins/}; app=${tail%%/*}
+        if [ -L "$root/usr/share/e5-infoscreen/www/plugins/$app" ] ||
+           [ -f "$root/etc/e5-infoscreen/plugins/$app/manifest.json" ]; then continue; fi ;;
+    esac
+    source=$work/payload/$name
+    target=$root/$name
+    if [ -d "$source" ]; then mkdir -p "$target"; continue; fi
+    [ -f "$source" ] || { echo "Missing archive file: $name" >&2; exit 1; }
+    mkdir -p "$(dirname "$target")"
+    pending=$target.infoscreen-new.$$
+    [ ! -e "$pending" ] && [ ! -L "$pending" ] || { echo 'Staging filename is occupied' >&2; exit 1; }
+    cp -p "$source" "$pending"
+    mv -f "$pending" "$target"
+    pending=
+done < "$work/names"

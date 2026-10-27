@@ -14,6 +14,7 @@
 # package is root/ as it is in git, owned by root.
 set -eu
 cd "$(dirname "$0")/.."
+python3 tools/build-native.py --check
 field() { [ -f .version ] && sed -n "s/^$1=//p" .version | head -1; }
 V=$(field version); V=${V:-$(cat root/usr/share/e5-infoscreen/VERSION)}
 printf '%s\n' "$V" > root/usr/share/e5-infoscreen/VERSION

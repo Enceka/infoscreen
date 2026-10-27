@@ -26,7 +26,7 @@ button:active { filter:brightness(1.22); }
 #mobile-toolbar button { flex-shrink:0; width:40px; height:42px; display:flex; align-items:center; justify-content:center; color:var(--dim); border:0; background:transparent; padding:8px; border-radius:12px; }
 #mobile-toolbar #mobile-back { width:30px; }
 #mobile-toolbar #mobile-lock { margin-left:auto; }
-#pages { top:calc(var(--status-h) + var(--toolbar-h)); bottom:var(--nav-h); transition:transform .24s cubic-bezier(.22,.75,.2,1); }
+#pages { top:calc(var(--status-h) + var(--toolbar-h)); bottom:var(--nav-h); }
 .page { padding:8px 12px 14px; gap:9px; scrollbar-width:none; }
 .card { padding:12px; border-radius:15px; border:1px solid #ffffff08; box-shadow:0 2px 2px #00000008; flex-shrink:0; }
 .btn { min-height:40px; border-radius:11px; padding:8px 12px; background:#233246; border-color:transparent; color:var(--text); }

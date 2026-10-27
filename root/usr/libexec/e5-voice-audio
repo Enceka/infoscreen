@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stable service entry point; all resident voice/screen transport is native.
+exec /usr/libexec/e5-voice-native "$@"

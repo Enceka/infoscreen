@@ -1,5 +1,10 @@
 # Device UI integration
 
+On `minikano-openwrt-feats`, the current seven-profile integration and native
+service requirements are documented in [the branch integration guide](MINIKANO-INTEGRATION.zh-CN.md).
+Its exact imported E5 commit is recorded in [E5-SOURCE.json](E5-SOURCE.json).
+The historical integration below describes the earlier default-branch port.
+
 The mobile interface formerly staged by e5-linux's T551M adaptation is now part of infoscreen itself.
 The same committed frontend/API/services support E5, T551M and M8 through runtime device configuration.
 `tools/stage.py` copies `root/` into an offline root; it does not patch a pinned base or generate JavaScript.

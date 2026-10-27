@@ -1,5 +1,10 @@
 # e5-infoscreen
 
+本分支同步 Minikano OpenWrt 当前共用屏幕程序，覆盖 E5、T551M、M8、T512N、
+远航 41S、K1 和 LYM-10K。使用前请阅读[接入与构建说明](docs/MINIKANO-INTEGRATION.zh-CN.md)，
+并核对[来源记录](docs/E5-SOURCE.json)。需要配套 E5 固件后台；本次没有修改正式版本、
+发布更新包或切换线上更新源。
+
 > English: [`README.md`](README.md)
 
 荣悦 E5 在 OpenWrt 下的信息屏，用于设备上 320×480 的屏幕。OpenWrt 指的是

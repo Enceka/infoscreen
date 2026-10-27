@@ -1,0 +1,6 @@
+tools/*.py text eol=lf
+src/native/*.[ch] text eol=lf
+root/usr/share/e5-infoscreen/native-build.json text eol=lf
+root/usr/libexec/t551m-screen-power binary
+root/usr/libexec/t551m-sim-status binary
+root/usr/libexec/e5-voice-native binary

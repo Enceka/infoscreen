@@ -2,6 +2,17 @@ These tests use a disposable OpenWrt container and mocked browser requests.
 They never send modem call-control commands. Do not run the API fixture test
 on a live E5; it creates a temporary installed test plugin.
 
+For the Minikano branch, begin with `python3 -m unittest discover -s tests/device -p test_minikano_stage.py`.
+`test_screen.py` compiles the actual native screen-power source on Linux.
+`test_sim_status.py` and `test_operator_names.py` compile the actual C collector;
+they need host GLib/json-c development headers, or set
+`INFOSCREEN_TEST_SDK_VOLUME` to an existing OpenWrt SDK volume for the json-c headers.
+The dashboard comparison is optional: set `INFOSCREEN_DASHBOARD_PARSER` and supply ucode.
+`test_screen_apn_browser.py` runs standalone and no longer needs a parent checkout.
+`test_phone_browser.py --push` uses the local synthetic SSE fixture, not a retired Python production daemon.
+Browser fixtures for unrelated features explicitly disable the default lock;
+the keypad suite verifies shell-owned call/power keys and power-only wake.
+
 Run `notifications.uc` with a writable copy of
 `root/usr/share/e5-infoscreen` at `/usr/share/e5-infoscreen`, and copy
 `tests/fixtures/fixture` into its `www/plugins/fixture` directory first.

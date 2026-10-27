@@ -56,8 +56,8 @@ def main():
             return self.reply({'ok':True})
     stream=[None];stop=threading.Event()
     if a.push:
-        sys.path.insert(0,str(Path(__file__).resolve().parents[4]/'device/openwrt_device_common/overlay/usr/lib/e5'))
-        from e5_call_events import CallEvents
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+        from call_events_fixture import CallEvents
         stream[0]=CallEvents()
         def publish():
             while not stop.wait(.02):

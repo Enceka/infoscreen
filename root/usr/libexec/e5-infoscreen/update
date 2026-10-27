@@ -87,11 +87,11 @@ install_archive() {
 	( cd / && for f in $(cat "$T/names"); do [ -f "$f" ] && echo "$f"; done ) > "$T/old"
 	mkdir -p "$(dirname "$BACKUP")"
 	tar -czf "$BACKUP" -C / -T "$T/old" 2>/dev/null || die "cannot save the files it replaces"
-	tar -xzf "$archive" -C / || die "unpacking failed (the old files: update rollback)"
+	/usr/libexec/e5-infoscreen/install-files "$archive" || die "installing failed (the old files: update rollback)"
 	/etc/init.d/rpcd reload >/dev/null 2>&1
 	echo "installed $v (was: $(tar -xzOf "$BACKUP" usr/share/e5-infoscreen/VERSION 2>/dev/null || echo '?'))"
 	rm -rf "$T"
-	( sleep 1; /etc/init.d/e5-infoscreen restart ) >/dev/null 2>&1 &
+	( sleep 1; for s in t551m-screen-power t551m-sim-status e5-voice-audio e5-infoscreen; do /etc/init.d/$s restart; done ) >/dev/null 2>&1 &
 }
 
 do_apply() {
@@ -111,10 +111,10 @@ do_apply() {
 do_rollback() {
 	[ -f "$BACKUP" ] || die "no backup: no update was installed"
 	compatible_archive "$BACKUP"
-	tar -xzf "$BACKUP" -C / || die "restoring failed"
+	/usr/libexec/e5-infoscreen/install-files "$BACKUP" || die "restoring failed"
 	echo "back to $(current)"
 	rm -f "$BACKUP" "$STATE"
-	( sleep 1; /etc/init.d/e5-infoscreen restart ) >/dev/null 2>&1 &
+	( sleep 1; for s in t551m-screen-power t551m-sim-status e5-voice-audio e5-infoscreen; do /etc/init.d/$s restart; done ) >/dev/null 2>&1 &
 }
 
 case "${1:-}" in

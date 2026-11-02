@@ -95,7 +95,7 @@ return view.extend({
 
 	load: function() {
 		return Promise.all([ callList(), callVersion() ]).then(function(r) {
-			return { apps: r[0] || [], version: r[1].version || '-' };
+			return { apps: r[0] || [], version: r[1] || '-' };
 		});
 	},
 
